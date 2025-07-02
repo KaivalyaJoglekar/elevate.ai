@@ -1,12 +1,13 @@
 import type { CareerData } from '../types';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+// Remove trailing slash to avoid double slashes
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '');
 
 // Temporary debugging
 console.log('🔍 Debug Info:');
-console.log('- Backend URL:', BACKEND_URL);
+console.log('- Original env var:', import.meta.env.VITE_BACKEND_URL);
+console.log('- Cleaned Backend URL:', BACKEND_URL);
 console.log('- Environment Mode:', import.meta.env.MODE);
-console.log('- VITE_BACKEND_URL env var:', import.meta.env.VITE_BACKEND_URL);
 
 export const analyzeResume = async (
   fileContent: string
