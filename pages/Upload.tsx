@@ -6,7 +6,7 @@ import { ArrowPathIcon } from '@heroicons/react/24/solid';
 
 import { useResumeContext } from '../hooks/useResumeContext';
 import { readFileAsBase64 } from '../utils/fileParser';
-import { analyzeResume } from '../services/geminiService';
+import { analyzeResume } from '../services/backendService';
 import AnimatedPage from '../components/AnimatedPage';
 import { AppLogo } from '../components/AppLogo';
 import ThemeToggleButton from '../components/ThemeToggleButton';
