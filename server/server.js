@@ -92,15 +92,20 @@ app.get('/health', (req, res) => {
 });
 
 app.post('/api/analyze-resume', async (req, res) => {
+  console.log('📥 Received analysis request');
+  
   try {
     const { fileContent } = req.body;
+    console.log('📄 File content length:', fileContent?.length || 0);
 
     if (!fileContent) {
+      console.log('❌ No file content provided');
       return res.status(400).json({ 
         error: 'File content is required' 
       });
     }
 
+    console.log('🤖 Calling Gemini API...');
     const prompt = GEMINI_PROMPT_TEMPLATE.replace('{resume_content}', fileContent);
 
     const response = await ai.models.generateContent({
@@ -113,26 +118,42 @@ app.post('/api/analyze-resume', async (req, res) => {
       },
     });
 
+    console.log('✅ Gemini API response received');
+    
     let jsonStr = response.text.trim();
+    console.log('📝 Response length:', jsonStr.length);
+    
     const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
     const match = jsonStr.match(fenceRegex);
     if (match && match[2]) {
       jsonStr = match[2].trim();
+      console.log('🔧 Removed markdown fences');
     }
     
+    console.log('🔍 Parsing JSON response...');
     const parsedData = JSON.parse(jsonStr);
+    console.log('✅ JSON parsed successfully');
+    
     res.json(parsedData);
 
   } catch (error) {
-    console.error('Error analyzing resume with Gemini API:', error);
+    console.error('❌ Error analyzing resume:', error);
+    console.error('Error type:', typeof error);
+    console.error('Error name:', error?.name);
+    console.error('Error message:', error?.message);
+    console.error('Error stack:', error?.stack);
     
     if (error instanceof Error) {
       res.status(500).json({ 
-        error: `Failed to analyze resume. Gemini API Error: ${error.message}` 
+        error: `Failed to analyze resume. Error: ${error.message}`,
+        errorType: error.name,
+        timestamp: new Date().toISOString()
       });
     } else {
       res.status(500).json({ 
-        error: 'An unknown error occurred while analyzing the resume.' 
+        error: 'An unknown error occurred while analyzing the resume.',
+        errorDetails: String(error),
+        timestamp: new Date().toISOString()
       });
     }
   }

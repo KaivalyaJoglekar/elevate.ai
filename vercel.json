@@ -7,5 +7,10 @@
   ],
   "env": {
     "VITE_BACKEND_URL": "https://elevateai-production.up.railway.app"
+  },
+  "build": {
+    "env": {
+      "VITE_BACKEND_URL": "https://elevateai-production.up.railway.app"
+    }
   }
 }
