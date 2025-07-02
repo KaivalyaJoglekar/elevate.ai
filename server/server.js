@@ -11,7 +11,13 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Default Vite dev server port
+  origin: [
+    process.env.FRONTEND_URL || 'http://localhost:5173',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://elevate-ai-zeta.vercel.app',
+    'https://elevateai-production.up.railway.app'
+  ],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' })); // Increase limit for base64 files
