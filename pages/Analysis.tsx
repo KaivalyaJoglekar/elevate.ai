@@ -88,13 +88,21 @@ const Analysis: React.FC = () => {
             <button
                 onClick={handleReset}
                 className="w-10 h-10 bg-white dark:bg-dark-card border border-gray-200 dark:border-neutral-800 rounded-full flex items-center justify-center text-gray-600 dark:text-subtle-text hover:bg-gray-50 dark:hover:bg-neutral-800 transition-all focus:outline-none focus:ring-2 focus:ring-brand-purple/50"
-                aria-label="New Analysis"
+                aria-label="Back to Upload"
             >
                 <ArrowLeftIcon className="w-5 h-5" />
             </button>
             <AppLogo />
         </div>
-        <ThemeToggleButton />
+        <div className="flex items-center gap-4">
+            <button
+                onClick={handleReset}
+                className="px-4 py-2 bg-gradient-to-br from-red-500 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transform hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+            >
+                New Analysis
+            </button>
+            <ThemeToggleButton />
+        </div>
       </header>
       
       <motion.main 
@@ -154,7 +162,7 @@ const Analysis: React.FC = () => {
             <motion.div className="bg-transparent border border-gray-200 dark:border-neutral-800 rounded-2xl shadow-glow p-4 sm:p-8" variants={itemVariants}>
                <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 text-gray-800 dark:text-light-text">Career Deep Dive</h2>
 
-               <div className="w-full mb-8" style={{ height: '400px' }} key={`chart-${selectedPath?.role}`}>
+               <div className="w-full mb-8" style={{ height: '500px' }} key={`chart-${selectedPath?.role}`}>
                   <CompatibilityChart paths={validCareerPaths} selectedRole={selectedPath?.role ?? null} />
                </div>
 

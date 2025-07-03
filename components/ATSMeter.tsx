@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, animate } from 'framer-motion';
 import { useTheme } from '../hooks/useTheme';
 
@@ -9,28 +9,30 @@ interface AtsScoreCardProps {
 
 const AtsScoreCard: React.FC<AtsScoreCardProps> = ({ score, feedback }) => {
   const { theme } = useTheme();
+  const [animatedScore, setAnimatedScore] = useState(0);
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const strokeDashoffset = circumference - (animatedScore / 100) * circumference;
 
   const scoreColor = score > 85 ? 'text-green-500 dark:text-green-400' : score > 70 ? 'text-sky-500 dark:text-sky-400' : 'text-yellow-500 dark:text-yellow-400';
   
   const ringColor = score > 85 ? '#22c55e' : score > 70 ? '#0ea5e9' : '#eab308';
+  const ringGlow = score > 85 ? '0 0 20px rgba(34, 197, 94, 0.4)' : score > 70 ? '0 0 20px rgba(14, 165, 233, 0.4)' : '0 0 20px rgba(234, 179, 8, 0.4)';
   
   const scoreRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    const node = scoreRef.current;
-    if (node) {
-      const controls = animate(0, score, {
-        duration: 1.5,
-        ease: "circOut",
-        onUpdate(value) {
-          node.textContent = Math.round(value).toString();
+    const controls = animate(0, score, {
+      duration: 2,
+      ease: "easeOut",
+      onUpdate(value) {
+        setAnimatedScore(value);
+        if (scoreRef.current) {
+          scoreRef.current.textContent = Math.round(value).toString();
         }
-      });
-      return () => controls.stop();
-    }
+      }
+    });
+    return () => controls.stop();
   }, [score]);
 
 

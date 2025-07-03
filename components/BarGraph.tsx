@@ -40,7 +40,7 @@ const CompatibilityChart: React.FC<CompatibilityChartProps> = ({ paths, selected
       <BarChart 
         key={`barchart-${selectedRole}`}
         data={sortedData} 
-        margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+        margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
       >
         <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false}/>
         <XAxis 
@@ -59,7 +59,7 @@ const CompatibilityChart: React.FC<CompatibilityChartProps> = ({ paths, selected
           tickFormatter={(tick) => `${tick}%`}
           axisLine={false}
           tickLine={false}
-          width={40}
+          width={60}
         />
         <Tooltip
           cursor={{ fill: 'rgba(139, 92, 246, 0.1)' }}

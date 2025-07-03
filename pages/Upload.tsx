@@ -10,6 +10,7 @@ import { analyzeResume } from '../services/backendService';
 import AnimatedPage from '../components/AnimatedPage';
 import { AppLogo } from '../components/AppLogo';
 import ThemeToggleButton from '../components/ThemeToggleButton';
+import FullScreenLoader from '../components/FullScreenLoader';
 import { CloudArrowUpIcon, MagnifyingGlassIcon } from '../components/icons';
 
 const MAX_FILE_SIZE_MB = 2;
@@ -96,7 +97,8 @@ const Upload: React.FC = () => {
 
   return (
     <AnimatedPage>
-<div className="min-h-screen text-gray-800 dark:text-light-text flex flex-col items-center">
+      <FullScreenLoader isVisible={isLoading} />
+      <div className="min-h-screen text-gray-800 dark:text-light-text flex flex-col items-center">
         <header className="w-full max-w-6xl mx-auto flex justify-between items-center py-4">
             <AppLogo />
             <ThemeToggleButton />

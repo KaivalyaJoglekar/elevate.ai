@@ -1,9 +1,15 @@
 
 export const GEMINI_PROMPT_TEMPLATE = `
-Analyze the following resume content. Your goal is to act as an expert career coach and provide a detailed, structured analysis.
+Analyze the following resume content carefully. The resume may contain information in various formats including:
+- Tables with education/experience data
+- Structured layouts with dates, positions, institutions
+- Mixed text and tabular information
+- Different formatting styles
+
+Your goal is to act as an expert career coach and provide a detailed, structured analysis.
 Return a single, valid JSON object without any markdown formatting (e.g., no \\\`\\\`\\\`json ... \\\`\\\`\\\`).
 
-The JSON object must conform to this TypeScript interface:
+Your task is to accurately parse educational details including institution name, degree, GPA, and any relevant coursework from ANY format (text, tables, structured layouts).
 interface AtsScore { score: number; feedback: string; }
 interface Skill { name: string; }
 interface SkillProficiency { skill: string; userProficiency: number; requiredProficiency: number; }
@@ -35,7 +41,12 @@ Instructions:
     - **feedback**: One sentence of constructive feedback on the ATS score.
 4.  **extractedSkills**: Extract a comprehensive list of all key technical and soft skills found in the resume. Return at least 10 skills.
 5.  **experienceSummary**: Provide a bulleted list summarizing each major role from the work experience section. Each summary should be a concise string.
-6.  **educationSummary**: Provide a bulleted list summarizing the education section (e.g., "B.S. in Computer Science - University of Technology").
+6.  **educationSummary**: Extract ONLY the exact education information from the resume. Do NOT modify, abbreviate, or assume anything:
+    - Copy the EXACT degree name as written
+    - Copy the EXACT institution name as written  
+    - Copy the EXACT graduation date as written
+    - Copy the EXACT GPA as written
+    Example format: "B.Tech. in Computer Science - NMIMS Mukesh Patel School of Technology Management and Engineering Mumbai, India (Expected June 2027, GPA: 3.81/4.00)"
 7.  **careerPaths**: Identify and analyze 10-12 highly relevant career paths. For each path:
     - **role**: The job title.
     - **description**: A brief, one-sentence description of why this role is a potential fit.
