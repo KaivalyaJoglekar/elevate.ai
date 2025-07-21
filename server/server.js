@@ -203,7 +203,7 @@ const analyzeResumeWithRetry = async (prompt, maxRetries = 3) => {
       console.log(`Attempt ${attempts + 1} to analyze resume...`);
       
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-Pro",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
