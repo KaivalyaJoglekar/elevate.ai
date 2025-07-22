@@ -15,7 +15,6 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:5173',
-    'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:3000',
     'https://elevate-ai-zeta.vercel.app',
@@ -61,11 +60,12 @@ setInterval(() => {
   for (const [key, value] of analysisCache.entries()) {
     if (now - value.timestamp > CACHE_TTL) {
       analysisCache.delete(key);
+      console.log(`Cache entry ${key} expired and removed.`);
     }
   }
 }, 10 * 60 * 1000); // Clean every 10 minutes
 
-// Constants - using the same prompt template as the frontend
+// --- PROMPT UPDATED AS PER YOUR REQUEST ---
 const GEMINI_PROMPT_TEMPLATE = `
 Analyze the following resume content carefully. The resume may contain information in various formats including:
 - Tables with education/experience data
@@ -136,12 +136,12 @@ Instructions:
     5. DISCOVER actual GPA if mentioned (3.7, 8.2/10, 85%, etc.)
     
     ABSOLUTE PROHIBITIONS:
-    🚫 DO NOT use "NMIMS" unless you see "NMIMS" in the resume
-    🚫 DO NOT use "B.Tech. in Computer Science" unless written exactly
-    🚫 DO NOT use "Expected June 2027" unless written exactly
-    🚫 DO NOT use "GPA: 3.81/4.00" unless written exactly
-    🚫 DO NOT fabricate any education information
-    🚫 DO NOT use previous examples as templates
+    🚫 DO NOT invent institution names (e.g., "Tech University," "Anytown College") if they are not in the resume.
+    🚫 DO NOT invent degree names (e.g., "B.Tech. in Fictional Studies") unless written exactly as it appears.
+    🚫 DO NOT invent graduation dates (e.g., "Expected June 2027") unless the date is present in the text.
+    🚫 DO NOT invent GPA scores (e.g., "GPA: 3.8/4.0") if one is not explicitly mentioned.
+    🚫 DO NOT fabricate ANY part of the education information. You must only extract what is there.
+    🚫 DO NOT use these examples or any previous outputs as a template for the current resume.
     
     VALIDATION CHECKLIST:
     ✅ Did I find actual university/college names in the resume text?
@@ -188,7 +188,7 @@ app.get('/api/stats', (req, res) => {
     apiCalls: apiCallCount,
     cacheHits: cacheHitCount,
     errors: errorCount,
-    cacheHitRate: apiCallCount > 0 ? ((cacheHitCount / (apiCallCount + cacheHitCount)) * 100).toFixed(2) + '%' : '0%',
+    cacheHitRate: (apiCallCount + cacheHitCount) > 0 ? ((cacheHitCount / (apiCallCount + cacheHitCount)) * 100).toFixed(2) + '%' : '0%',
     uptime: process.uptime()
   });
 });
@@ -203,16 +203,16 @@ const analyzeResumeWithRetry = async (prompt, maxRetries = 3) => {
       console.log(`Attempt ${attempts + 1} to analyze resume...`);
       
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro-latest",
+        model: "gemini-2.5-flash-preview-05-20", // Using the requested 2.5 flash preview model
         contents: prompt,
         config: {
           responseMimeType: "application/json",
           temperature: 0.3,
-          thinkingConfig: { thinkingBudget: 0 }
         },
       });
 
       let jsonStr = response.text.trim();
+      // Regular expression to find and extract JSON content from within markdown fences
       const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
       const match = jsonStr.match(fenceRegex);
       if (match && match[2]) {
@@ -221,25 +221,13 @@ const analyzeResumeWithRetry = async (prompt, maxRetries = 3) => {
       
       const parsedData = JSON.parse(jsonStr);
       
-      // Validate the response has required fields
+      // Validate that the response contains essential fields
       if (!parsedData.name || !parsedData.summary || !parsedData.atsScore) {
-        throw new Error('Invalid response format from AI');
+        throw new Error('Invalid response format from AI: Missing essential fields.');
       }
       
-      // Additional validation for education summary
+      // Ensure educationSummary is always an array
       if (!Array.isArray(parsedData.educationSummary)) {
-        parsedData.educationSummary = [];
-      }
-      
-      // Check for placeholder education data and replace with empty array
-      if (parsedData.educationSummary.some(edu => 
-        edu.includes('NMIMS') || 
-        edu.includes('Expected June 2027') ||
-        edu.includes('GPA: 3.81/4.00') ||
-        edu.includes('B.Tech. in Computer Science') ||
-        edu.includes('[') || edu.includes(']')
-      )) {
-        console.warn('Detected placeholder education data, clearing it');
         parsedData.educationSummary = [];
       }
       
@@ -256,7 +244,7 @@ const analyzeResumeWithRetry = async (prompt, maxRetries = 3) => {
       
       console.log(`Retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      delay *= 2; // Exponential backoff
+      delay *= 2; // Exponential backoff for retries
     }
   }
 };
@@ -271,12 +259,17 @@ app.post('/api/analyze-resume', analyzeResumeRateLimit, async (req, res) => {
       });
     }
 
-    // Clear any existing cache to ensure fresh analysis
-    analysisCache.clear();
-    console.log('Cache cleared before analysis to ensure real-time data');
-
-    // Log request for monitoring
-    console.log(`Processing new resume analysis request at ${new Date().toISOString()}`);
+    // Generate a cache key from the resume content
+    const cacheKey = generateCacheKey(fileContent);
+    // Check if a valid analysis already exists in the cache
+    if (analysisCache.has(cacheKey)) {
+      cacheHitCount++;
+      console.log(`Cache hit for key: ${cacheKey}`);
+      return res.json(analysisCache.get(cacheKey).data);
+    }
+    
+    // If not in cache, proceed with new analysis
+    console.log(`Cache miss. Processing new resume analysis request at ${new Date().toISOString()}`);
     
     const prompt = GEMINI_PROMPT_TEMPLATE.replace('{resume_content}', fileContent);
     
@@ -284,41 +277,35 @@ app.post('/api/analyze-resume', analyzeResumeRateLimit, async (req, res) => {
     apiCallCount++;
     
     console.log(`Fresh analysis completed successfully`);
-    console.log('=== EDUCATION EXTRACTION DEBUG ===');
-    console.log('Education Summary from AI:', JSON.stringify(parsedData.educationSummary, null, 2));
-    console.log('First 500 chars of resume:', fileContent.substring(0, 500));
-    console.log('=== END DEBUG ===');
     
-    // Don't cache the result to ensure every analysis is fresh
+    // Store the new analysis in the cache
+    analysisCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: parsedData
+    });
     
     res.json(parsedData);
 
   } catch (error) {
+    errorCount++; // Increment error counter
     console.error('Final error analyzing resume:', error?.message || error);
     
-    // Check if it's a quota/rate limit error
     if (error.message.includes('quota') || error.message.includes('rate limit')) {
       return res.status(429).json({ 
-        error: 'API quota exceeded. Please try again later.' 
+        error: 'API quota exceeded or rate limit hit. Please try again later.' 
       });
     }
     
-    // Check if it's a JSON parsing error
-    if (error.message.includes('JSON')) {
+    // Check specifically for JSON parsing errors
+    if (error instanceof SyntaxError) {
       return res.status(422).json({ 
-        error: 'AI returned invalid format. Please try again.' 
+        error: 'The AI returned an invalid or malformed format. Please try again.' 
       });
     }
     
-    if (error instanceof Error) {
-      res.status(500).json({ 
-        error: `Failed to analyze resume: ${error.message}`
-      });
-    } else {
-      res.status(500).json({ 
-        error: 'An unknown error occurred while analyzing the resume.'
-      });
-    }
+    res.status(500).json({ 
+      error: `Failed to analyze resume: ${error.message || 'An unknown error occurred'}`
+    });
   }
 });
 
