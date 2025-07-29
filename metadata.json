@@ -1,0 +1,6 @@
+{
+  "name": "Elevate.ai - AI Career Co-pilot",
+  "description": "Elevate your career. Upload your resume for an intelligent analysis of your skills, ATS score, and tailored career path recommendations powered by Gemini AI.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

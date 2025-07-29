@@ -1,0 +1,14 @@
+[build]
+  builder = "nixpacks"
+  buildCommand = "cd server && npm install"
+
+[deploy]
+  startCommand = "cd server && npm start"
+  restartPolicyType = "always"
+
+[environment]
+  NODE_ENV = "production"
+
+# Tell Railway to only deploy the server directory
+[paths]
+  include = ["server/**"]
