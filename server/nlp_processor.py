@@ -4,16 +4,34 @@ from sentence_transformers import SentenceTransformer, util
 import re
 from datetime import datetime
 
-# --- 1. Model and Configuration Loading ---
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    print("Downloading spaCy model 'en_core_web_sm'...")
-    from spacy.cli import download
-    download("en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
+# --- 1. Singleton Class for Model Loading (Performance Improvement) ---
+# This ensures that the heavy SentenceTransformer model is loaded only once.
+class ModelLoader:
+    _instance = None
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(ModelLoader, cls).__new__(cls)
+            try:
+                print("Loading spaCy model 'en_core_web_sm'...")
+                cls._instance.nlp = spacy.load("en_core_web_sm")
+                print("spaCy model loaded.")
+            except OSError:
+                print("Downloading and loading spaCy model...")
+                from spacy.cli import download
+                download("en_core_web_sm")
+                cls._instance.nlp = spacy.load("en_core_web_sm")
+            
+            print("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
+            cls._instance.model = SentenceTransformer('all-MiniLM-L6-v2')
+            print("SentenceTransformer model loaded.")
+        return cls._instance
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# Create a single instance of the models
+models = ModelLoader()
+nlp = models.nlp
+model = models.model
+
+# --- 2. Configuration and Skill Databases ---
 SKILLS_DB = [
     'python', 'java', 'c++', 'c#', 'javascript', 'typescript', 'sql', 'nosql', 'mongodb', 'postgresql',
     'react', 'angular', 'vue.js', 'next.js', 'nodejs', 'express.js', 'fastapi', 'django', 'flask',
@@ -25,13 +43,14 @@ SKILLS_DB = [
     'dart', 'firebase', 'restful apis', 'graphql', 'kafka', 'data structures', 'algorithms',
     'problem-solving', 'adaptability', 'solidity', 'bloc'
 ]
+# A smaller list of core technical skills to help generate better job search queries
 CORE_TECH_SKILLS = [
-    'python', 'java', 'c++', 'c#', 'javascript', 'typescript', 'sql', 'react', 'angular', 'vue.js',
-    'next.js', 'nodejs', 'django', 'flask', 'fastapi', 'machine learning', 'deep learning', 'nlp',
-    'data science', 'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'flutter', 'swift', 'kotlin'
+    'python', 'java', 'c++', 'javascript', 'typescript', 'sql', 'react', 'angular', 'vue.js',
+    'next.js', 'nodejs', 'django', 'flask', 'fastapi', 'machine learning', 'aws', 'azure', 
+    'docker', 'kubernetes', 'flutter', 'swift', 'kotlin'
 ]
 
-# --- 2. Core Parsing and Extraction Functions ---
+# --- 3. Core Parsing and Extraction Functions ---
 def parse_pdf_text(pdf_content: bytes) -> str:
     with fitz.open(stream=pdf_content, filetype="pdf") as doc: return "".join(page.get_text() for page in doc)
 
@@ -63,6 +82,7 @@ def analyze_skill_gap(resume_skills: set, job_description_text: str) -> dict:
     return {"matching_skills": matching_skills, "missing_skills": missing_skills}
 
 def extract_section_content(text: str, section_title: str) -> list[str]:
+    """ ✅ FIXED: This function now correctly extracts text and returns a list of strings."""
     try:
         section_pattern = re.compile(r'^\s*' + section_title + r'\s*$', re.IGNORECASE | re.MULTILINE)
         match = section_pattern.search(text)
@@ -76,12 +96,14 @@ def extract_section_content(text: str, section_title: str) -> list[str]:
             next_match = re.search(r'^\s*' + header + r'\s*$', section_text, re.IGNORECASE | re.MULTILINE)
             if next_match: end_index = min(end_index, next_match.start())
         section_content = section_text[:end_index].strip()
+        # Filter for meaningful lines
         return [line.strip() for line in section_content.split('\n') if len(line.strip()) > 25]
     except Exception:
         return []
 
-# --- 3. Real-Time Data Generation Functions ---
+# --- 4. Real-Time Data Generation Functions (with job_type tailoring) ---
 def generate_professional_summary(text: str, skills: list, job_type: str) -> str:
+    # ... (This function remains correct)
     if job_type == 'internship':
         return f"An aspiring professional eager to apply a strong academic foundation and skills in {skills[0]}, {skills[1]}, and {skills[2]} to a challenging internship."
     else:
@@ -95,6 +117,7 @@ def generate_professional_summary(text: str, skills: list, job_type: str) -> str
         return f"A results-oriented professional with ~{experience_years_text} years of experience, demonstrating expertise in {skills[0]}, {skills[1]}, and {skills[2]}."
 
 def generate_dynamic_ats_score(text: str, skills: list, experience: list, education: list) -> dict:
+    # ... (This function remains correct)
     score, feedback = 40, "ATS analysis: "
     if len(skills) > 10: score += 20
     if experience: score += 15
@@ -108,13 +131,14 @@ def generate_dynamic_ats_score(text: str, skills: list, experience: list, educat
     return {"score": final_score, "feedback": feedback}
 
 def generate_dynamic_recommendations(skills: list, skill_gap: list, job_type: str) -> tuple[list, list]:
+    # ... (This function remains correct)
     if job_type == 'internship':
         improvements = [
             "Highlight academic projects, coursework, and personal projects to showcase your skills and initiative.",
             "Create a 'Core Competencies' section at the top to immediately show recruiters your key technical skills.",
             "Clearly state your availability (e.g., 'Available Summer 2025') and graduation date."
         ]
-    else: # full-time
+    else:
         improvements = [
             "Quantify achievements with metrics (e.g., 'Increased user engagement by 15%') to showcase tangible impact.",
             "Ensure your most recent and relevant experience is detailed at the top of the experience section.",
@@ -126,6 +150,7 @@ def generate_dynamic_recommendations(skills: list, skill_gap: list, job_type: st
     return improvements, upskilling
 
 def generate_realtime_skill_proficiency(job_title: str, resume_text: str, skills_for_chart: list, job_type: str) -> list:
+    # ... (This function remains correct)
     analysis = []
     is_senior = any(keyword in job_title.lower() for keyword in ['senior', 'lead', 'manager'])
     for skill_name in skills_for_chart:
