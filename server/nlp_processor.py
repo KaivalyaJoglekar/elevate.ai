@@ -3,19 +3,20 @@ from sentence_transformers import SentenceTransformer, util
 import re
 from datetime import datetime
 
-# --- (ModelLoader and SKILLS_DB remain the same) ---
-class ModelLoader:
-    _instance = None
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(ModelLoader, cls).__new__(cls)
-            print("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
-            cls._instance.model = SentenceTransformer('all-MiniLM-L6-v2')
-            print("SentenceTransformer model loaded.")
-        return cls._instance
+# Lazily loaded model, initialized to None
+model = None
 
-models = ModelLoader()
-model = models.model
+def get_model():
+    """
+    Loads the SentenceTransformer model if it hasn't been loaded yet.
+    Returns the loaded model.
+    """
+    global model
+    if model is None:
+        print("Lazy loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        print("SentenceTransformer model loaded successfully.")
+    return model
 
 SKILLS_DB = [
     'python', 'java', 'c++', 'c#', 'javascript', 'typescript', 'sql', 'nosql', 'mongodb', 'postgresql',
@@ -34,7 +35,6 @@ CORE_TECH_SKILLS = [
     'docker', 'kubernetes', 'flutter', 'swift', 'kotlin'
 ]
 
-# --- (Parsing functions remain the same) ---
 def parse_pdf_text(pdf_content: bytes) -> str:
     with fitz.open(stream=pdf_content, filetype="pdf") as doc: return "".join(page.get_text() for page in doc)
 
@@ -48,8 +48,10 @@ def extract_skills(text: str) -> list:
     return sorted(list(set(skill.lower() for skill in found_skills)))
 
 def calculate_semantic_similarity(resume_text: str, job_descriptions: list) -> list:
-    resume_embedding = model.encode(resume_text, convert_to_tensor=True)
-    job_embeddings = model.encode(job_descriptions, convert_to_tensor=True)
+    """Calculates similarity using the lazily-loaded model."""
+    loaded_model = get_model()
+    resume_embedding = loaded_model.encode(resume_text, convert_to_tensor=True)
+    job_embeddings = loaded_model.encode(job_descriptions, convert_to_tensor=True)
     cosine_scores = util.pytorch_cos_sim(resume_embedding, job_embeddings)
     return [score.item() for score in cosine_scores[0]]
 
@@ -77,19 +79,17 @@ def extract_section_content(text: str, section_title: str) -> list[str]:
     except Exception:
         return []
 
-# ✅ RESTORED: This is the original, correct function for job-specific analysis.
 def generate_realtime_skill_proficiency(job_title: str, resume_text: str, skills_for_chart: list, job_type: str) -> list:
     analysis = []
     is_senior = any(keyword in job_title.lower() for keyword in ['senior', 'lead', 'manager'])
     for skill_name in skills_for_chart:
         mentions = resume_text.lower().count(skill_name.lower())
         user_proficiency = min(40 + (mentions * 15), 90)
-
         if job_type == 'internship':
             required_proficiency = 60
         else:
+            # ✅ FIXED: Removed the space in 'required_proficiency'
             required_proficiency = 85 if is_senior else 70
-
         analysis.append({
             "skill": skill_name.title(),
             "userProficiency": user_proficiency,
@@ -100,7 +100,6 @@ def generate_realtime_skill_proficiency(job_title: str, resume_text: str, skills
 def generate_professional_summary(text: str, skills: list, job_type: str) -> str:
     if not skills or len(skills) < 3:
         skills.extend(['valuable skills'] * (3 - len(skills)))
-
     if job_type == 'internship':
         return f"An aspiring professional eager to apply a strong academic foundation and skills in {skills[0]}, {skills[1]}, and {skills[2]} to a challenging internship."
     else:
@@ -119,14 +118,12 @@ def generate_dynamic_ats_score(text: str, skills: list, experience: list, educat
     if any(v in text.lower() for v in ['developed', 'led', 'managed', 'created']): score += 10
     if re.search(r'\d+%', text): score += 5
     final_score = min(score, 95)
-
     if final_score > 85:
         feedback += "Excellent keyword and section formatting."
     elif final_score > 65:
         feedback += "Good structure. Could be enhanced with more quantifiable results."
     else:
         feedback += "Consider adding more specific skills and using stronger action verbs."
-
     return {"score": final_score, "feedback": feedback}
 
 def generate_dynamic_recommendations(skills: list, skill_gap: list, job_type: str) -> tuple[list, list]:
@@ -142,9 +139,7 @@ def generate_dynamic_recommendations(skills: list, skill_gap: list, job_type: st
             "Ensure your most recent and relevant experience is detailed at the top of the experience section.",
             f"Tailor your summary to align with senior roles, emphasizing leadership and your expertise in {skills[1] if len(skills) > 1 else 'key areas'} and {skills[2] if len(skills) > 2 else 'related fields'}."
         ]
-
     upskilling = [f"Deepen your expertise in '{skill_gap[0]}'."] if skill_gap else []
     upskilling.append("Explore cloud technologies (AWS, Azure) as they are valuable at all experience levels.")
     upskilling.append("Contribute to an open-source project to build a public portfolio.")
-
     return improvements, upskilling
