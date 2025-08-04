@@ -37,13 +37,14 @@ const DeepDiveSection = ({ path }: { path: CareerPath }) => {
                 <div className="flex items-start gap-4">
                     <LightbulbIcon className="w-8 h-8 text-violet-500 dark:text-violet-400 mt-1 shrink-0" />
                     <div>
+                        {/* ✅ RESTORED: Added dark theme text colors */}
                         <h3 className="text-2xl font-bold font-sans text-gray-900 dark:text-light-text">Deep Dive: <span className="text-violet-600 dark:text-violet-300">{path.role}</span></h3>
                         <p className="text-gray-600 dark:text-subtle-text mt-1">{path.description}</p>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* ✅ FIXED: Applied new glassmorphism style to the "Relevant Skills" card. */}
+                    {/* ✅ RESTORED: Added dark theme styles for the card */}
                     <div className="bg-white/50 dark:bg-transparent p-6 rounded-2xl border border-brand-purple/50 dark:border-neutral-700 min-h-[150px] shadow-glow">
                         <h4 className="flex items-center gap-3 mb-4 text-lg font-bold text-gray-800 dark:text-light-text"><ThumbsUpIcon className="w-5 h-5 text-green-500 dark:text-green-400"/>Relevant Skills</h4>
                         {hasRelevantSkills ? (
@@ -59,7 +60,7 @@ const DeepDiveSection = ({ path }: { path: CareerPath }) => {
                         )}
                     </div>
 
-                    {/* ✅ FIXED: Applied new glassmorphism style to the "Skills to Develop" card. */}
+                    {/* ✅ RESTORED: Added dark theme styles for the card */}
                     <div className="bg-white/50 dark:bg-transparent p-6 rounded-2xl border border-brand-purple/50 dark:border-neutral-700 min-h-[150px] shadow-glow">
                         <h4 className="flex items-center gap-3 mb-4 text-lg font-bold text-gray-800 dark:text-light-text"><SkillDevelopIcon className="w-5 h-5 text-sky-500 dark:text-sky-400"/>Skills to Develop</h4>
                         {hasSkillsToDevelop ? (
@@ -77,7 +78,7 @@ const DeepDiveSection = ({ path }: { path: CareerPath }) => {
                 </div>
 
                 {hasProficiencyAnalysis && (
-                    // ✅ FIXED: Applied new glassmorphism style to the "Skill Proficiency Gap" card.
+                    // ✅ RESTORED: Added dark theme styles for the card
                     <div className="bg-white/50 dark:bg-transparent p-6 rounded-2xl border border-brand-purple/50 dark:border-neutral-700 shadow-glow">
                         <div className="flex items-center gap-3 mb-3">
                             <RadarIcon className="w-6 h-6 text-violet-500 dark:text-violet-400" />
