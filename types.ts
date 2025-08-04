@@ -1,9 +1,9 @@
 // src/types.ts
 
-// This represents a SINGLE analysis (either full-time or internship)
 export interface AtsScore { score: number; feedback: string; }
 export interface Skill { name: string; }
 export interface SkillProficiency { skill: string; userProficiency: number; requiredProficiency: number; }
+
 export interface CareerPath {
   role: string;
   employer_name: string;
@@ -15,6 +15,7 @@ export interface CareerPath {
   skillsToDevelop: Skill[];
   skillProficiencyAnalysis: SkillProficiency[];
 }
+
 export interface CareerData {
   name: string;
   summary: string;
@@ -27,13 +28,11 @@ export interface CareerData {
   generalUpskillingSuggestions: string[];
 }
 
-// This is the top-level object our app will now use
 export interface DualAnalysisData {
     full_time_analysis: CareerData;
     internship_analysis: CareerData;
 }
 
-// Update the context to use the new DualAnalysisData type
 export interface ResumeAnalysisContextType {
   analysis: DualAnalysisData | null;
   setAnalysis: (analysis: DualAnalysisData | null) => void;

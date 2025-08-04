@@ -36,7 +36,8 @@ const TipsPanel: React.FC<TipsPanelProps> = ({ title, icon, tips, color }) => {
   };
 
   return (
-    <div className="bg-transparent border border-gray-200 dark:border-neutral-800 rounded-2xl p-6 h-full shadow-glow">
+    // ✅ FIXED: Added bg-white/50 for light theme and border-brand-purple/50 for the glowing border effect.
+    <div className="bg-white/50 dark:bg-transparent border border-brand-purple/50 dark:border-neutral-800 rounded-2xl p-6 h-full shadow-glow">
         <div className="flex items-center gap-4 mb-4">
           {icon}
           <h2 className="text-2xl font-bold text-gray-800 dark:text-light-text">{title}</h2>

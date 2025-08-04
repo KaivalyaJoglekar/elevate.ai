@@ -7,16 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import binascii
 
-# ✅ MODIFIED: Import the CORE_TECH_SKILLS list
 from nlp_processor import *
 from jsearch_client import fetch_jobs_from_jsearch
 
 app = FastAPI(title="Elevate-AI Dual Analysis Backend")
 
-# This list will contain the URLs of our deployed frontend and backend.
-# We will add them after we deploy.
 origins = [
-    "http://localhost:5173", # For local development
+    "http://localhost:5173",
     "http://12-7.0.0.1:5173",
 ]
 
@@ -35,50 +32,40 @@ def perform_analysis(resume_text: str, job_type: str) -> dict:
     name = extract_name(resume_text)
     skills = extract_skills(resume_text)
     if not skills: raise ValueError("No skills found.")
-    
+
     experience_summary = extract_section_content(resume_text, "Experience")
     education_summary = extract_section_content(resume_text, "Education")
     professional_summary = generate_professional_summary(resume_text, skills, job_type)
     ats_score = generate_dynamic_ats_score(resume_text, skills, experience_summary, education_summary)
-    
-    # ✅ --- MODIFIED: More Robust Job Search Logic ---
+
     job_listings = None
-    
-    # 1. Prioritize core technical skills for the search
     prioritized_skills = [s for s in skills if s in CORE_TECH_SKILLS]
     if prioritized_skills:
-        print(f"Attempting search with prioritized skill: {prioritized_skills[0]}")
         job_listings = fetch_jobs_from_jsearch(query=f'"{prioritized_skills[0]} {job_type}"')
-
-    # 2. If no results, fall back to the first skill found in the resume
     if not job_listings and skills:
-        print(f"Falling back to first extracted skill: {skills[0]}")
         job_listings = fetch_jobs_from_jsearch(query=f'"{skills[0]} {job_type}"')
-
-    # 3. If still no results, use a general fallback query
     if not job_listings:
-        print("Falling back to general 'Software Engineer' query.")
         job_listings = fetch_jobs_from_jsearch(query=f'"Software Engineer {job_type}"')
-        
     job_listings = job_listings or []
-    # --- End of Modification ---
 
     career_paths = []
     first_skill_gap = []
     if job_listings:
         job_descriptions = [job.get('job_description', '') for job in job_listings]
-        # Ensure job_descriptions is not empty before proceeding
         if job_descriptions:
             similarity_scores = calculate_semantic_similarity(resume_text, job_descriptions)
             for i, job in enumerate(job_listings[:15]):
-                # Make sure the index is within the bounds of similarity_scores
                 if i < len(similarity_scores):
                     skill_gap = analyze_skill_gap(set(skills), job_descriptions[i])
                     if i == 0 and skill_gap["missing_skills"]: first_skill_gap = skill_gap["missing_skills"]
+
                     relevant_skills = [{"name": s} for s in skill_gap["matching_skills"]]
                     skills_to_develop = [{"name": s} for s in skill_gap["missing_skills"]]
+
+                    # ✅ RESTORED: Generate proficiency analysis for each specific job path.
                     skills_for_chart = [s['name'] for s in relevant_skills[:4]] + [s['name'] for s in skills_to_develop[:3]]
                     skill_proficiency_data = generate_realtime_skill_proficiency(job.get("job_title", ""), resume_text, skills_for_chart, job_type)
+
                     career_paths.append({
                         "role": job.get("job_title", "N/A"),
                         "employer_name": job.get("employer_name", "N/A"),
@@ -88,16 +75,22 @@ def perform_analysis(resume_text: str, job_type: str) -> dict:
                         "matchPercentage": int(round(similarity_scores[i] * 100)),
                         "relevantSkills": relevant_skills,
                         "skillsToDevelop": skills_to_develop,
-                        "skillProficiencyAnalysis": skill_proficiency_data
+                        "skillProficiencyAnalysis": skill_proficiency_data, # Appended here
                     })
             career_paths.sort(key=lambda x: x["matchPercentage"], reverse=True)
-    
+
     improvements, upskilling = generate_dynamic_recommendations(skills, first_skill_gap, job_type)
+
     return {
-        "name": name, "summary": professional_summary, "atsScore": ats_score,
-        "extractedSkills": [{"name": s} for s in skills], "experienceSummary": experience_summary,
-        "educationSummary": education_summary, "careerPaths": career_paths,
-        "generalResumeImprovements": improvements, "generalUpskillingSuggestions": upskilling,
+        "name": name,
+        "summary": professional_summary,
+        "atsScore": ats_score,
+        "extractedSkills": [{"name": s} for s in skills],
+        "experienceSummary": experience_summary,
+        "educationSummary": education_summary,
+        "careerPaths": career_paths,
+        "generalResumeImprovements": improvements,
+        "generalUpskillingSuggestions": upskilling,
     }
 
 @app.post("/analyze-resume-dual/")
@@ -118,10 +111,8 @@ async def analyze_resume_dual_endpoint(request: ResumeRequest):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        # Generic error handler for other unexpected issues during analysis
         print(f"An unexpected error occurred during analysis: {e}")
         raise HTTPException(status_code=500, detail="An internal error occurred during analysis.")
-
 
 @app.get("/")
 def read_root():

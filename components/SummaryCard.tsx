@@ -8,7 +8,6 @@ interface SummaryCardProps {
   displayAs?: 'pills' | 'list';
 }
 
-// Color palette for skill pills
 const pillColorClasses = [
     { light: 'bg-violet-100 border-violet-200 text-violet-700', dark: 'dark:bg-violet-500/10 dark:border-violet-500/20 dark:text-violet-300'},
     { light: 'bg-sky-100 border-sky-200 text-sky-700', dark: 'dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-300'},
@@ -30,8 +29,9 @@ const listItemVariants = {
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ icon, title, items, displayAs = 'pills' }) => {
   return (
+    // ✅ FIXED: Added bg-white/50 for light theme and border-brand-purple/50 for the glowing border effect.
     <div 
-      className="bg-transparent border border-gray-200 dark:border-neutral-800 rounded-2xl p-6 h-full shadow-glow"
+      className="bg-white/50 dark:bg-transparent border border-brand-purple/50 dark:border-neutral-800 rounded-2xl p-6 h-full shadow-glow"
     >
       <div className="flex items-center gap-3 mb-4">
         {icon}

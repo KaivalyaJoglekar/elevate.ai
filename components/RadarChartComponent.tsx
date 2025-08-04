@@ -17,12 +17,10 @@ const ProficiencyRadarChart: React.FC<ProficiencyRadarChartProps> = ({ skills })
   }));
   
   const textColor = theme === 'dark' ? '#9CA3AF' : '#4b5563';
-  // ✅ FIXED: Grid color for light theme is now a much darker grey for visibility
-  const gridColor = theme === 'dark' ? '#374151' : '#9CA3AF';
+  const gridColor = theme === 'dark' ? '#374151' : '#d1d5db';
   const tooltipBg = theme === 'dark' ? 'rgba(17, 17, 17, 0.9)' : 'rgba(255, 255, 255, 0.9)';
   const tooltipBorder = theme === 'dark' ? '#2D2D2D' : '#e5e7eb';
 
-  // Define colors from brand
   const userColor = '#8B5CF6'; // brand-purple
   const requiredColor = '#60A5FA'; // brand-blue
 
@@ -59,7 +57,9 @@ const ProficiencyRadarChart: React.FC<ProficiencyRadarChartProps> = ({ skills })
                 <stop offset="95%" stopColor={requiredColor} stopOpacity={0.05}/>
             </linearGradient>
         </defs>
+        
         <PolarGrid gridType="circle" stroke={gridColor} strokeDasharray="3 3" />
+        
         <PolarAngleAxis 
             dataKey="subject" 
             tick={{ fill: textColor, fontSize: 13, fontWeight: 500 }} 
@@ -72,6 +72,7 @@ const ProficiencyRadarChart: React.FC<ProficiencyRadarChartProps> = ({ skills })
             wrapperStyle={{ paddingTop: '25px' }} 
             formatter={(value) => <span style={{ color: textColor, marginLeft: '4px' }}>{value}</span>}
         />
+        
         <Radar 
             name="Your Proficiency" 
             dataKey="user" 
@@ -82,6 +83,7 @@ const ProficiencyRadarChart: React.FC<ProficiencyRadarChartProps> = ({ skills })
             animationDuration={1200}
             activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2, fill: userColor }}
         />
+        
         <Radar 
             name="Required Proficiency" 
             dataKey="required" 

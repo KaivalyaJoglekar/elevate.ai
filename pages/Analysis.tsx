@@ -12,11 +12,11 @@ import DeepDiveSection from '../components/DeepDiveSection';
 import TipsPanel from '../components/TipsPanel';
 import CompatibilityChart from '../components/BarGraph';
 import ThemeToggleButton from '../components/ThemeToggleButton';
-import { 
-    AcademicCapIcon, 
-    BriefcaseIcon, 
-    PencilSquareIcon, 
-    PuzzlePieceIcon, 
+import {
+    AcademicCapIcon,
+    BriefcaseIcon,
+    PencilSquareIcon,
+    PuzzlePieceIcon,
     ChevronDownIcon,
     ArrowLeftIcon,
     MagnifyingGlassIcon
@@ -61,7 +61,7 @@ const JobCard = ({ job, variants }: { job: CareerPath, variants: Variants }) => 
           ))}
         </div>
       </div>
-      <a 
+      <a
         href={job.job_link}
         target="_blank"
         rel="noopener noreferrer"
@@ -81,15 +81,15 @@ const Analysis: React.FC = () => {
   const [currentView, setCurrentView] = useState<AnalysisView>('full-time');
   const [selectedPath, setSelectedPath] = useState<CareerPath | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const dataToDisplay: CareerData | null = analysis
     ? (currentView === 'full-time' ? analysis.full_time_analysis : analysis.internship_analysis)
     : null;
-  
+
   const validCareerPaths = (dataToDisplay?.careerPaths || []).filter(p => p?.role && p.matchPercentage);
   const hasValidAnalysis = analysis && analysis.full_time_analysis && analysis.internship_analysis;
-  
-  const filteredJobs = validCareerPaths.filter(job => 
+
+  const filteredJobs = validCareerPaths.filter(job =>
     job.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
     job.employer_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -113,10 +113,9 @@ const Analysis: React.FC = () => {
   if (!analysis) {
     return <Navigate to="/" replace />;
   }
-  
+
   return (
     <AnimatedPage>
-      {/* ✅ FIXED: Header now has a back button on the left and other buttons on the right */}
       <header className="flex justify-between items-center mb-10">
         <div className="flex">
             <button
@@ -133,9 +132,9 @@ const Analysis: React.FC = () => {
           <ThemeToggleButton />
         </div>
       </header>
-      
+
       <motion.main key={currentView} className="space-y-16" variants={containerVariants} initial="hidden" animate="visible">
-        
+
         <div className="flex items-center justify-center p-1 space-x-1 bg-gray-100 dark:bg-dark-card border border-gray-200 dark:border-neutral-800 rounded-lg max-w-md mx-auto">
           <button
             onClick={() => setCurrentView('full-time')}
@@ -157,7 +156,7 @@ const Analysis: React.FC = () => {
               <h1 className="text-3xl md:text-4xl font-bold font-sans tracking-tight text-gray-900 dark:text-white">{dataToDisplay.name}</h1>
               <p className="mt-2 text-lg text-gray-600 dark:text-neutral-400 max-w-3xl mx-auto">{dataToDisplay.summary}</p>
             </motion.div>
-            
+
             <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-8" variants={itemVariants}>
               <AtsScoreCard score={dataToDisplay.atsScore.score} feedback={dataToDisplay.atsScore.feedback} />
               <div className="md:col-span-2">
@@ -169,10 +168,10 @@ const Analysis: React.FC = () => {
               {dataToDisplay.experienceSummary && dataToDisplay.experienceSummary.length > 0 && <SummaryCard icon={<BriefcaseIcon className="w-6 h-6 text-violet-500" />} title="Experience Summary" items={dataToDisplay.experienceSummary} displayAs="list" />}
               {dataToDisplay.educationSummary && dataToDisplay.educationSummary.length > 0 && <SummaryCard icon={<AcademicCapIcon className="w-6 h-6 text-violet-500" />} title="Education Summary" items={dataToDisplay.educationSummary} displayAs="list" />}
             </motion.div>
-            
+
             {validCareerPaths.length > 0 ? (
               <motion.div className="p-4 sm:p-8" variants={itemVariants}>
-                 <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 text-gray-900 dark:text-white">Career Deep Dive for {currentView === 'full-time' ? 'Full-Time Roles' : 'Internships'}</h2>
+                 <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 text-gray-900 dark:text-white">Career Path Deep Dive</h2>
                  <div className="w-full mb-8" style={{ height: '500px' }}>
                     <CompatibilityChart paths={validCareerPaths} selectedRole={selectedPath?.role ?? null} />
                  </div>
@@ -207,7 +206,7 @@ const Analysis: React.FC = () => {
                 </h2>
                 <div className="relative w-full max-w-xs">
                     <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-neutral-500 pointer-events-none" />
-                    <input 
+                    <input
                       type="text"
                       placeholder="Filter opportunities..."
                       value={searchTerm}
