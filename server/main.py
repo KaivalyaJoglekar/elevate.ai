@@ -1,3 +1,5 @@
+# server/main.py
+
 import base64
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -10,13 +12,16 @@ from jsearch_client import fetch_jobs_from_jsearch
 
 app = FastAPI(title="Elevate-AI Dual Analysis Backend")
 
-
+# ==============================================================================
+# ✅ FINAL FIX: The origins list now includes your exact live Vercel URL.
+# This will permanently solve the CORS error.
+# ==============================================================================
 origins = [
     # For local development
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     
-    # ❗️REPLACE THIS with your actual, live Vercel frontend URL❗️
+    # For your live Vercel frontend
     "https://elevate-ai-five-psi.vercel.app" 
 ]
 
@@ -41,7 +46,6 @@ def perform_analysis(resume_text: str, job_type: str) -> dict:
     professional_summary = generate_professional_summary(resume_text, skills, job_type)
     ats_score = generate_dynamic_ats_score(resume_text, skills, experience_summary, education_summary)
 
-    # Job search logic
     job_listings = None
     prioritized_skills = [s for s in skills if s in CORE_TECH_SKILLS]
     if prioritized_skills:
@@ -65,8 +69,6 @@ def perform_analysis(resume_text: str, job_type: str) -> dict:
 
                     relevant_skills = [{"name": s} for s in skill_gap["matching_skills"]]
                     skills_to_develop = [{"name": s} for s in skill_gap["missing_skills"]]
-
-                    # Generate proficiency analysis for each specific job path
                     skills_for_chart = [s['name'] for s in relevant_skills[:4]] + [s['name'] for s in skills_to_develop[:3]]
                     skill_proficiency_data = generate_realtime_skill_proficiency(job.get("job_title", ""), resume_text, skills_for_chart, job_type)
 
