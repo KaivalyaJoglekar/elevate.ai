@@ -1,22 +1,13 @@
 import fitz
-from sentence_transformers import SentenceTransformer, util
+# MODIFIED: Removed sentence-transformers to prevent memory overload.
+# from sentence_transformers import SentenceTransformer, util 
 import re
 from datetime import datetime
 
-# Lazily loaded model, initialized to None
-model = None
-
-def get_model():
-    """
-    Loads the SentenceTransformer model if it hasn't been loaded yet.
-    Returns the loaded model.
-    """
-    global model
-    if model is None:
-        print("Lazy loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        print("SentenceTransformer model loaded successfully.")
-    return model
+# MODIFIED: Removed the model loading logic entirely to save memory.
+# model = None
+# def get_model():
+#    ...
 
 SKILLS_DB = [
     'python', 'java', 'c++', 'c#', 'javascript', 'typescript', 'sql', 'nosql', 'mongodb', 'postgresql',
@@ -47,13 +38,31 @@ def extract_skills(text: str) -> list:
     found_skills = re.findall(skill_pattern, text.lower(), re.IGNORECASE)
     return sorted(list(set(skill.lower() for skill in found_skills)))
 
-def calculate_semantic_similarity(resume_text: str, job_descriptions: list) -> list:
-    """Calculates similarity using the lazily-loaded model."""
-    loaded_model = get_model()
-    resume_embedding = loaded_model.encode(resume_text, convert_to_tensor=True)
-    job_embeddings = loaded_model.encode(job_descriptions, convert_to_tensor=True)
-    cosine_scores = util.pytorch_cos_sim(resume_embedding, job_embeddings)
-    return [score.item() for score in cosine_scores[0]]
+# ✅ FIXED: Replaced memory-intensive semantic similarity with a lightweight keyword-based approach.
+def calculate_keyword_similarity(resume_skills_set: set, job_descriptions: list[str]) -> list[float]:
+    """Calculates similarity based on shared keywords to avoid memory crashes."""
+    scores = []
+    for desc in job_descriptions:
+        job_skills_set = set(extract_skills(desc))
+        
+        if not resume_skills_set and not job_skills_set:
+            scores.append(0.0)
+            continue
+        
+        intersection = len(resume_skills_set.intersection(job_skills_set))
+        union = len(resume_skills_set.union(job_skills_set))
+        
+        if union == 0:
+            scores.append(0.0)
+        else:
+            # Using Jaccard similarity
+            jaccard_score = intersection / union
+            # Scale score to be more intuitive, similar to original range
+            scaled_score = min(0.50 + (jaccard_score * 0.49), 0.99)
+            scores.append(scaled_score)
+            
+    return scores
+
 
 def analyze_skill_gap(resume_skills: set, job_description_text: str) -> dict:
     job_skills_set = set(extract_skills(job_description_text))
@@ -88,7 +97,6 @@ def generate_realtime_skill_proficiency(job_title: str, resume_text: str, skills
         if job_type == 'internship':
             required_proficiency = 60
         else:
-            # ✅ FIXED: Removed the space in 'required_proficiency'
             required_proficiency = 85 if is_senior else 70
         analysis.append({
             "skill": skill_name.title(),

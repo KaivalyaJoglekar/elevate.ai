@@ -7,14 +7,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import binascii
 
-from nlp_processor import *
+# MODIFIED: Replaced semantic similarity with keyword similarity to save memory
+from nlp_processor import (
+    parse_pdf_text,
+    extract_name,
+    extract_skills,
+    extract_section_content,
+    generate_professional_summary,
+    generate_dynamic_ats_score,
+    analyze_skill_gap,
+    generate_realtime_skill_proficiency,
+    generate_dynamic_recommendations,
+    calculate_keyword_similarity, # <-- Replaced semantic with keyword
+    CORE_TECH_SKILLS
+)
 from jsearch_client import fetch_jobs_from_jsearch
 
 app = FastAPI(title="Elevate-AI Dual Analysis Backend")
 
 # ==============================================================================
-# ✅ FINAL FIX: The origins list now includes your exact live Vercel URL.
-# This will permanently solve the CORS error.
+# ✅ FIXED: The origins list now includes your exact live Vercel URL to fix the CORS error.
 # ==============================================================================
 origins = [
     # For local development
@@ -61,7 +73,8 @@ def perform_analysis(resume_text: str, job_type: str) -> dict:
     if job_listings:
         job_descriptions = [job.get('job_description', '') for job in job_listings]
         if job_descriptions:
-            similarity_scores = calculate_semantic_similarity(resume_text, job_descriptions)
+            # MODIFIED: Using keyword similarity instead of semantic similarity to prevent memory crashes.
+            similarity_scores = calculate_keyword_similarity(set(skills), job_descriptions)
             for i, job in enumerate(job_listings[:15]):
                 if i < len(similarity_scores):
                     skill_gap = analyze_skill_gap(set(skills), job_descriptions[i])
