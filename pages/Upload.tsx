@@ -1,9 +1,7 @@
-// pages/Upload.tsx
-
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone, FileRejection } from 'react-dropzone';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowPathIcon } from '@heroicons/react/24/solid';
 
 import { useResumeContext } from '../hooks/useResumeContext';
@@ -18,44 +16,50 @@ import { CloudArrowUpIcon, MagnifyingGlassIcon } from '../components/icons';
 const MAX_FILE_SIZE_MB = 2;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-const sectionVariants: Variants = {
+const sectionVariants = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.2,
-    },
-  },
+  visible: { opacity: 1, transition: { staggerChildren: 0.2 } },
 };
 
-const itemVariants: Variants = {
+const itemVariants = {
   hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: { type: 'spring', stiffness: 100 }
-  },
+  visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 100 } },
 };
+
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 const Upload: React.FC = () => {
-    const { setAnalysis, setIsLoading, setError, isLoading, setFileName, error, file, setFile } = useResumeContext();
+    // ✅ FIXED: Correctly import 'isLoading' from the context
+    const { setAnalysis, setIsLoading, isLoading, setError, error, file, setFile, setFileName } = useResumeContext();
     const navigate = useNavigate();
+    
+    const [loadingMessage, setLoadingMessage] = useState('Waking up the server...');
 
     const handleAnalyze = async () => {
         if (!file) return;
-        setIsLoading(true);
+        
+        // This is the single source of truth for the loading state
+        setIsLoading(true); 
         setError(null);
         setFileName(file.name);
+        setLoadingMessage('Waking up the server...');
+
         try {
+            // Wake-up ping
+            await fetch(BACKEND_URL);
+
+            setLoadingMessage('AI analysis in progress...');
             const base64Content = await readFileAsBase64(file);
             const result = await analyzeResume(base64Content);
+            
             setAnalysis(result);
             navigate('/analysis');
+
         } catch (err) {
             console.error(err);
             setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
         } finally {
-            setIsLoading(false);
+            setIsLoading(false); // Turn off loading state in all cases
         }
     };
 
@@ -88,7 +92,8 @@ const Upload: React.FC = () => {
 
   return (
     <AnimatedPage>
-      <FullScreenLoader isVisible={isLoading} />
+      {/* ✅ FIXED: The loader's visibility is now correctly controlled by the 'isLoading' state. */}
+      <FullScreenLoader isVisible={isLoading} message={loadingMessage} />
       <div className="min-h-screen text-gray-800 dark:text-light-text flex flex-col items-center">
         <header className="w-full max-w-6xl mx-auto flex justify-end items-center py-4 px-4 sm:px-0">
             <ThemeToggleButton />
@@ -101,7 +106,6 @@ const Upload: React.FC = () => {
                 initial="hidden"
                 animate="visible"
             >
-                {/* ✅ FIXED: Gradient updated to brighter colors for more pop */}
                 <motion.h1 variants={itemVariants} className="text-4xl md:text-6xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-pink-500">
                   Elevate Your Career Profile
                 </motion.h1>
@@ -133,15 +137,17 @@ const Upload: React.FC = () => {
                 </motion.div>
 
                 <motion.div variants={itemVariants} className="mt-8">
+                    {/* ✅ FIXED: The button's disabled state is now correctly controlled by 'isLoading'. */}
                     <button
                         onClick={handleAnalyze}
                         disabled={!file || isLoading}
                         className="flex items-center justify-center px-10 py-3 text-lg font-semibold text-white rounded-lg transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed bg-gradient-to-br from-red-500 to-pink-500 hover:brightness-110 disabled:brightness-50"
                     >
+                        {/* ✅ FIXED: The button's text is now correctly controlled by 'isLoading'. */}
                         {isLoading ? (
                             <>
                                 <ArrowPathIcon className="animate-spin h-5 w-5 mr-3" />
-                                Analyzing...
+                                {loadingMessage}
                             </>
                         ) : (
                             <>

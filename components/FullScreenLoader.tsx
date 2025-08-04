@@ -1,12 +1,10 @@
 import React from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { useTheme } from '../hooks/useTheme'; // Import the theme hook
+import { useTheme } from '../hooks/useTheme';
 
-// --- The animation component now accepts a theme prop ---
 const LoaderAnimation = ({ theme }: { theme: 'light' | 'dark' }) => {
   return (
-    // The theme prop is passed to the styled component
     <StyledLoaderWrapper theme={theme}>
       <div className="loader">
         <div className="loader-orbits">
@@ -19,13 +17,10 @@ const LoaderAnimation = ({ theme }: { theme: 'light' | 'dark' }) => {
   );
 };
 
-// --- The styled-component now uses the theme prop to set colors ---
 const StyledLoaderWrapper = styled.div<{ theme: 'light' | 'dark' }>`
-  /* Nucleus */
   .loader {
     --float: 5%;
     --radius: 2rem;
-    /* ✅ FIXED: Nucleus color now uses brand purple */
     background: #8B5CF6; 
     border-radius: var(--radius);
     height: var(--radius);
@@ -33,7 +28,6 @@ const StyledLoaderWrapper = styled.div<{ theme: 'light' | 'dark' }>`
     width: var(--radius);
   }
   
-  /* Nucleus - Lighting */
   .loader::after {
     --light-x: 30%;
     --light-y: 25%;
@@ -52,9 +46,7 @@ const StyledLoaderWrapper = styled.div<{ theme: 'light' | 'dark' }>`
     width: 100%;
   }
 
-  /* Electrons */
   .loader-orbits {
-    /* ✅ FIXED: Colors are now dynamic based on the theme prop */
     --color-line: ${(props) => (props.theme === 'dark' ? '#fff' : '#4b5563')};
     --color-glow: ${(props) => (props.theme === 'dark' ? '#60A5FA' : '#8B5CF6')};
     --electron-nb: 3;
@@ -67,7 +59,7 @@ const StyledLoaderWrapper = styled.div<{ theme: 'light' | 'dark' }>`
     top: calc(50% - var(--radius) / 2);
     width: var(--radius);
   }
-  /* ... rest of the styles remain the same ... */
+  
   .loader-orbits__electron {
     --clip-radius: 20%;
     --radius: 100%;
@@ -126,42 +118,31 @@ const StyledLoaderWrapper = styled.div<{ theme: 'light' | 'dark' }>`
   }
 `;
 
-// --- Main FullScreenLoader Component ---
 interface FullScreenLoaderProps {
   isVisible: boolean;
+  message: string;
 }
 
-const FullScreenLoader: React.FC<FullScreenLoaderProps> = ({ isVisible }) => {
-  const { theme } = useTheme(); // Get the current theme
+const FullScreenLoader: React.FC<FullScreenLoaderProps> = ({ isVisible, message }) => {
+  const { theme } = useTheme();
   if (!isVisible) return null;
 
   return (
     <div 
-      // The backdrop is now a solid color with a backdrop blur for a better glass effect
       className="fixed inset-0 z-50 flex items-center justify-center bg-gray-100/80 dark:bg-black/80 backdrop-blur-md"
     >
       <div className="flex flex-col items-center">
-        {/* Pass the current theme to the animation component */}
         <LoaderAnimation theme={theme} />
         
-        <motion.h2
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="mt-16 text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-violet-400"
-          style={{ textShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)' }}
-        >
-          AI Analysis in Progress
-        </motion.h2>
-        
         <motion.p
+          key={message} // Animate when the message changes
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="text-gray-600 dark:text-gray-300 text-center max-w-xs mt-2"
+          transition={{ delay: 0.1 }}
+          className="text-gray-600 dark:text-gray-300 text-center max-w-xs mt-16 text-lg"
           style={{ textShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)' }}
         >
-          Our AI is building your career forecast...
+          {message}
         </motion.p>
       </div>
     </div>
