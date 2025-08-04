@@ -1,11 +1,13 @@
 import React from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
+import { useTheme } from '../hooks/useTheme'; // Import the theme hook
 
-// --- This is your original Loader component ---
-const LoaderAnimation = () => {
+// --- The animation component now accepts a theme prop ---
+const LoaderAnimation = ({ theme }: { theme: 'light' | 'dark' }) => {
   return (
-    <StyledLoaderWrapper>
+    // The theme prop is passed to the styled component
+    <StyledLoaderWrapper theme={theme}>
       <div className="loader">
         <div className="loader-orbits">
           <div className="loader-orbits__electron" />
@@ -17,23 +19,20 @@ const LoaderAnimation = () => {
   );
 };
 
-// --- This is your original styled-component code, unchanged ---
-const StyledLoaderWrapper = styled.div`
-  /*********/
-  /* Style */
-  /*********/
+// --- The styled-component now uses the theme prop to set colors ---
+const StyledLoaderWrapper = styled.div<{ theme: 'light' | 'dark' }>`
   /* Nucleus */
-  /***********/
-  /* Nucleus - Base */
   .loader {
     --float: 5%;
     --radius: 2rem;
-    background: #f33; /* Original Red */
+    /* ✅ FIXED: Nucleus color now uses brand purple */
+    background: #8B5CF6; 
     border-radius: var(--radius);
     height: var(--radius);
     position: relative;
     width: var(--radius);
   }
+  
   /* Nucleus - Lighting */
   .loader::after {
     --light-x: 30%;
@@ -54,11 +53,10 @@ const StyledLoaderWrapper = styled.div`
   }
 
   /* Electrons */
-  /*************/
-  /* Electrons - Container */
   .loader-orbits {
-    --color-line: #fff;
-    --color-glow: #0ff; /* Original Cyan */
+    /* ✅ FIXED: Colors are now dynamic based on the theme prop */
+    --color-line: ${(props) => (props.theme === 'dark' ? '#fff' : '#4b5563')};
+    --color-glow: ${(props) => (props.theme === 'dark' ? '#60A5FA' : '#8B5CF6')};
     --electron-nb: 3;
     --radius: 500%;
     border-radius: var(--radius);
@@ -69,7 +67,7 @@ const StyledLoaderWrapper = styled.div`
     top: calc(50% - var(--radius) / 2);
     width: var(--radius);
   }
-  /* Electrons - Base */
+  /* ... rest of the styles remain the same ... */
   .loader-orbits__electron {
     --clip-radius: 20%;
     --radius: 100%;
@@ -83,7 +81,6 @@ const StyledLoaderWrapper = styled.div`
     width: var(--radius);
     z-index: 100;
   }
-  /* Electrons - Light */
   .loader-orbits__electron::before,
   .loader-orbits__electron::after {
     border-radius: inherit;
@@ -97,34 +94,22 @@ const StyledLoaderWrapper = styled.div`
   }
   .loader-orbits__electron::before { --offset-direction: 0.1rem; }
   .loader-orbits__electron::after { --offset-direction: -0.1rem; }
-  /* Electrons - Mapping */
   .loader-orbits__electron:nth-child(1) { --index: 0; }
   .loader-orbits__electron:nth-child(2) { --index: 1; }
   .loader-orbits__electron:nth-child(3) { --index: 2; }
-
-  /****************/
-  /* Interactions */
-  /****************/
-  /* Atom */
   .loader {
     animation-name: floatAtom;
-    animation-duration: 2s; /* Original Speed */
+    animation-duration: 2s;
     animation-iteration-count: infinite;
     animation-timing-function: linear;
   }
-  /* Electrons */
   .loader-orbits__electron {
     animation-name: orbitElectron;
-    animation-delay: calc((var(--index) + 1) * 0.5s / var(--electron-nb)); /* Original Speed */
-    animation-duration: 0.5s; /* Original Speed */
+    animation-delay: calc((var(--index) + 1) * 0.5s / var(--electron-nb));
+    animation-duration: 0.5s;
     animation-iteration-count: infinite;
     animation-timing-function: linear;
   }
-
-  /**************/
-  /* Animations */
-  /**************/
-  /* Atom - Makes the atom float */
   @keyframes floatAtom {
     0% { transform: translateY(calc(-1 * var(--float))); }
     25% { transform: translateY(calc(-2 * var(--float))); }
@@ -132,7 +117,6 @@ const StyledLoaderWrapper = styled.div`
     75% { transform: translateY(calc(0 * var(--float))); }
     100% { transform: translateY(calc(-1 * var(--float))); }
   }
-  /* Electrons - Makes the electron's light orbit around the center */
   @keyframes orbitElectron {
     0% { clip-path: ellipse(calc(2 * var(--clip-radius)) var(--clip-radius) at 50% 0); }
     25% { clip-path: ellipse(calc(2 * var(--clip-radius)) var(--clip-radius) at 0 50%); }
@@ -148,15 +132,17 @@ interface FullScreenLoaderProps {
 }
 
 const FullScreenLoader: React.FC<FullScreenLoaderProps> = ({ isVisible }) => {
+  const { theme } = useTheme(); // Get the current theme
   if (!isVisible) return null;
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-white/10 dark:bg-black/10 backdrop-blur-lg"
+      // The backdrop is now a solid color with a backdrop blur for a better glass effect
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-100/80 dark:bg-black/80 backdrop-blur-md"
     >
       <div className="flex flex-col items-center">
-        {/* Your original animation is placed here */}
-        <LoaderAnimation />
+        {/* Pass the current theme to the animation component */}
+        <LoaderAnimation theme={theme} />
         
         <motion.h2
           initial={{ opacity: 0, y: 10 }}

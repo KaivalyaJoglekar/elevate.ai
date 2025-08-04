@@ -1,34 +1,22 @@
-import spacy
 import fitz
 from sentence_transformers import SentenceTransformer, util
 import re
 from datetime import datetime
 
-# --- 1. Singleton Class for Model Loading (Performance Improvement) ---
+# --- 1. Singleton Class for SentenceTransformer Model Loading ---
 # This ensures that the heavy SentenceTransformer model is loaded only once.
 class ModelLoader:
     _instance = None
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(ModelLoader, cls).__new__(cls)
-            try:
-                print("Loading spaCy model 'en_core_web_sm'...")
-                cls._instance.nlp = spacy.load("en_core_web_sm")
-                print("spaCy model loaded.")
-            except OSError:
-                print("Downloading and loading spaCy model...")
-                from spacy.cli import download
-                download("en_core_web_sm")
-                cls._instance.nlp = spacy.load("en_core_web_sm")
-            
             print("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
             cls._instance.model = SentenceTransformer('all-MiniLM-L6-v2')
             print("SentenceTransformer model loaded.")
         return cls._instance
 
-# Create a single instance of the models
+# Create a single instance of the model
 models = ModelLoader()
-nlp = models.nlp
 model = models.model
 
 # --- 2. Configuration and Skill Databases ---
@@ -50,24 +38,22 @@ CORE_TECH_SKILLS = [
     'docker', 'kubernetes', 'flutter', 'swift', 'kotlin'
 ]
 
-# --- 3. Core Parsing and Extraction Functions ---
+# --- 3. Core Parsing and Extraction Functions (Now spaCy-free) ---
 def parse_pdf_text(pdf_content: bytes) -> str:
     with fitz.open(stream=pdf_content, filetype="pdf") as doc: return "".join(page.get_text() for page in doc)
 
 def extract_name(text: str) -> str:
-    doc = nlp(text)
-    for ent in doc.ents:
-        if ent.label_ == "PERSON": return ent.text
-    match = re.search(r'^([A-Z][a-z]+)\s([A-Z][a-z]+)', text)
-    return match.group(0) if match else "Valued Professional"
+    # ✅ FIXED: Use a more precise regex to capture only "Firstname Lastname" and avoid extra text.
+    match = re.search(r'^\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+)+)', text)
+    return match.group(1).strip() if match else "Valued Professional"
 
 def extract_skills(text: str) -> list:
-    doc = nlp(text.lower())
-    matcher = spacy.matcher.PhraseMatcher(nlp.vocab, attr='LOWER')
-    skill_patterns = [nlp.make_doc(skill) for skill in SKILLS_DB]
-    matcher.add("SKILL", skill_patterns)
-    matches = matcher(doc)
-    return sorted(list(set(doc[start:end].text for _, start, end in matches)))
+    # Build a single regex pattern to find all skills in the SKILLS_DB
+    # \b ensures we match whole words only (e.g., 'java' not 'javascript')
+    skill_pattern = r'\b(' + '|'.join(re.escape(skill) for skill in SKILLS_DB) + r')\b'
+    # Find all non-overlapping matches in a case-insensitive manner
+    found_skills = re.findall(skill_pattern, text.lower(), re.IGNORECASE)
+    return sorted(list(set(skill.lower() for skill in found_skills)))
 
 def calculate_semantic_similarity(resume_text: str, job_descriptions: list) -> list:
     resume_embedding = model.encode(resume_text, convert_to_tensor=True)
@@ -78,7 +64,7 @@ def calculate_semantic_similarity(resume_text: str, job_descriptions: list) -> l
 def analyze_skill_gap(resume_skills: set, job_description_text: str) -> dict:
     job_skills_set = set(extract_skills(job_description_text))
     matching_skills = list(resume_skills.intersection(job_skills_set))
-    missing_skills = list(job_skills_set.difference(job_skills_set))
+    missing_skills = list(job_skills_set.difference(resume_skills)) # Corrected logic
     return {"matching_skills": matching_skills, "missing_skills": missing_skills}
 
 def extract_section_content(text: str, section_title: str) -> list[str]:
@@ -103,21 +89,18 @@ def extract_section_content(text: str, section_title: str) -> list[str]:
 
 # --- 4. Real-Time Data Generation Functions (with job_type tailoring) ---
 def generate_professional_summary(text: str, skills: list, job_type: str) -> str:
-    # ... (This function remains correct)
     if job_type == 'internship':
         return f"An aspiring professional eager to apply a strong academic foundation and skills in {skills[0]}, {skills[1]}, and {skills[2]} to a challenging internship."
     else:
-        doc = nlp(text)
         experience_years_text = "several"
-        dates = [ent.text for ent in doc.ents if ent.label_ == "DATE"]
-        years = [int(y) for y in re.findall(r'\b(20\d{2})\b', " ".join(dates)) if int(y) <= datetime.now().year]
+        # Directly use regex to find years in the whole text
+        years = [int(y) for y in re.findall(r'\b(20\d{2})\b', text) if int(y) <= datetime.now().year]
         if years:
             experience_years = datetime.now().year - min(years)
             if experience_years > 0: experience_years_text = str(experience_years)
         return f"A results-oriented professional with ~{experience_years_text} years of experience, demonstrating expertise in {skills[0]}, {skills[1]}, and {skills[2]}."
 
 def generate_dynamic_ats_score(text: str, skills: list, experience: list, education: list) -> dict:
-    # ... (This function remains correct)
     score, feedback = 40, "ATS analysis: "
     if len(skills) > 10: score += 20
     if experience: score += 15
@@ -131,7 +114,6 @@ def generate_dynamic_ats_score(text: str, skills: list, experience: list, educat
     return {"score": final_score, "feedback": feedback}
 
 def generate_dynamic_recommendations(skills: list, skill_gap: list, job_type: str) -> tuple[list, list]:
-    # ... (This function remains correct)
     if job_type == 'internship':
         improvements = [
             "Highlight academic projects, coursework, and personal projects to showcase your skills and initiative.",
@@ -150,7 +132,6 @@ def generate_dynamic_recommendations(skills: list, skill_gap: list, job_type: st
     return improvements, upskilling
 
 def generate_realtime_skill_proficiency(job_title: str, resume_text: str, skills_for_chart: list, job_type: str) -> list:
-    # ... (This function remains correct)
     analysis = []
     is_senior = any(keyword in job_title.lower() for keyword in ['senior', 'lead', 'manager'])
     for skill_name in skills_for_chart:

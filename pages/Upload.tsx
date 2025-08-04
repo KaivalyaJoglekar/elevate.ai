@@ -11,7 +11,6 @@ import { readFileAsBase64 } from '../utils/fileParser';
 import { analyzeResume } from '../services/backendService';
 
 import AnimatedPage from '../components/AnimatedPage';
-import { AppLogo } from '../components/AppLogo';
 import ThemeToggleButton from '../components/ThemeToggleButton';
 import FullScreenLoader from '../components/FullScreenLoader';
 import { CloudArrowUpIcon, MagnifyingGlassIcon } from '../components/icons';
@@ -49,7 +48,6 @@ const Upload: React.FC = () => {
         setFileName(file.name);
         try {
             const base64Content = await readFileAsBase64(file);
-            // The call is now simpler, as the backend handles both analyses
             const result = await analyzeResume(base64Content);
             setAnalysis(result);
             navigate('/analysis');
@@ -92,8 +90,7 @@ const Upload: React.FC = () => {
     <AnimatedPage>
       <FullScreenLoader isVisible={isLoading} />
       <div className="min-h-screen text-gray-800 dark:text-light-text flex flex-col items-center">
-        <header className="w-full max-w-6xl mx-auto flex justify-between items-center py-4">
-            <AppLogo />
+        <header className="w-full max-w-6xl mx-auto flex justify-end items-center py-4 px-4 sm:px-0">
             <ThemeToggleButton />
         </header>
         
@@ -104,7 +101,8 @@ const Upload: React.FC = () => {
                 initial="hidden"
                 animate="visible"
             >
-                <motion.h1 variants={itemVariants} className="text-4xl md:text-6xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-purple">
+                {/* ✅ FIXED: Gradient updated to brighter colors for more pop */}
+                <motion.h1 variants={itemVariants} className="text-4xl md:text-6xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-pink-500">
                   Elevate Your Career Profile
                 </motion.h1>
                 <motion.p variants={itemVariants} className="mt-3 text-lg md:text-xl text-gray-600 dark:text-subtle-text">

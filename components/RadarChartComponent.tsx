@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { Radar, RadarChart, PolarGrid, Legend, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import type { SkillProficiency } from '../types';
@@ -19,7 +17,8 @@ const ProficiencyRadarChart: React.FC<ProficiencyRadarChartProps> = ({ skills })
   }));
   
   const textColor = theme === 'dark' ? '#9CA3AF' : '#4b5563';
-  const gridColor = theme === 'dark' ? '#2D2D2D' : '#e5e7eb';
+  // ✅ FIXED: Grid color for light theme is now a much darker grey for visibility
+  const gridColor = theme === 'dark' ? '#374151' : '#9CA3AF';
   const tooltipBg = theme === 'dark' ? 'rgba(17, 17, 17, 0.9)' : 'rgba(255, 255, 255, 0.9)';
   const tooltipBorder = theme === 'dark' ? '#2D2D2D' : '#e5e7eb';
 
@@ -60,7 +59,7 @@ const ProficiencyRadarChart: React.FC<ProficiencyRadarChartProps> = ({ skills })
                 <stop offset="95%" stopColor={requiredColor} stopOpacity={0.05}/>
             </linearGradient>
         </defs>
-        <PolarGrid gridType="circle" stroke="white" strokeDasharray="3 3" strokeOpacity={0.2} />
+        <PolarGrid gridType="circle" stroke={gridColor} strokeDasharray="3 3" />
         <PolarAngleAxis 
             dataKey="subject" 
             tick={{ fill: textColor, fontSize: 13, fontWeight: 500 }} 

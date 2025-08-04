@@ -11,7 +11,6 @@ import SummaryCard from '../components/SummaryCard';
 import DeepDiveSection from '../components/DeepDiveSection';
 import TipsPanel from '../components/TipsPanel';
 import CompatibilityChart from '../components/BarGraph';
-import { AppLogo } from '../components/AppLogo';
 import ThemeToggleButton from '../components/ThemeToggleButton';
 import { 
     AcademicCapIcon, 
@@ -35,7 +34,6 @@ const itemVariants: Variants = {
 
 type AnalysisView = 'full-time' | 'internship';
 
-// --- ✅ REVERTED: Reusable Job Card Component restored to the initial, cleaner design ---
 const JobCard = ({ job, variants }: { job: CareerPath, variants: Variants }) => {
   return (
     <motion.div
@@ -44,7 +42,7 @@ const JobCard = ({ job, variants }: { job: CareerPath, variants: Variants }) => 
       initial="hidden"
       animate="visible"
       exit="hidden"
-      className="bg-transparent border border-gray-200 dark:border-neutral-800 rounded-2xl p-6 shadow-glow flex flex-col group transition-all duration-300 hover:border-brand-purple"
+      className="bg-white dark:bg-dark-card border border-gray-200 dark:border-neutral-800 rounded-2xl p-6 shadow-glow flex flex-col group transition-all duration-300 hover:border-brand-purple"
     >
       <div className="flex-grow">
         <div className="flex justify-between items-start mb-2">
@@ -57,7 +55,7 @@ const JobCard = ({ job, variants }: { job: CareerPath, variants: Variants }) => 
         <div className="flex flex-wrap gap-2">
           <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Relevant:</span>
           {job.relevantSkills.slice(0, 3).map(skill => (
-            <span key={skill.name} className="text-xs bg-gray-100 dark:bg-neutral-800 px-2 py-1 rounded">
+            <span key={skill.name} className="text-xs bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
               {skill.name}
             </span>
           ))}
@@ -118,15 +116,15 @@ const Analysis: React.FC = () => {
   
   return (
     <AnimatedPage>
+      {/* ✅ FIXED: Header now has a back button on the left and other buttons on the right */}
       <header className="flex justify-between items-center mb-10">
-        <div className="flex items-center gap-4">
+        <div className="flex">
             <button
                 onClick={handleReset}
-                className="w-10 h-10 bg-white dark:bg-[#1C1C1E] border border-neutral-800 rounded-full flex items-center justify-center text-neutral-400 hover:bg-neutral-800 transition-all focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
+                className="w-10 h-10 bg-white dark:bg-dark-card border border-gray-200 dark:border-neutral-800 rounded-full flex items-center justify-center text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-all focus:outline-none focus:ring-2 focus:ring-[#FF2D55]"
             >
                 <ArrowLeftIcon className="w-5 h-5" />
             </button>
-            <AppLogo />
         </div>
         <div className="flex items-center gap-4">
           <a onClick={handleReset} className="cursor-pointer px-5 py-2 bg-gradient-to-r from-[#FF2D55] to-[#FF5E3A] text-white font-semibold rounded-lg hover:brightness-110 transform transition-transform hover:scale-105">
@@ -138,16 +136,16 @@ const Analysis: React.FC = () => {
       
       <motion.main key={currentView} className="space-y-16" variants={containerVariants} initial="hidden" animate="visible">
         
-        <div className="flex items-center justify-center p-1 space-x-1 bg-[#1C1C1E] border border-neutral-800 rounded-lg max-w-md mx-auto">
+        <div className="flex items-center justify-center p-1 space-x-1 bg-gray-100 dark:bg-dark-card border border-gray-200 dark:border-neutral-800 rounded-lg max-w-md mx-auto">
           <button
             onClick={() => setCurrentView('full-time')}
-            className={`w-full px-6 py-2 text-sm font-semibold rounded-md transition-colors duration-300 ${currentView === 'full-time' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`}
+            className={`w-full px-6 py-2 text-sm font-semibold rounded-md transition-colors duration-300 ${currentView === 'full-time' ? 'bg-white shadow dark:bg-neutral-700 text-gray-800 dark:text-white' : 'text-gray-500 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-white'}`}
           >
             Full-Time Analysis
           </button>
           <button
             onClick={() => setCurrentView('internship')}
-            className={`w-full px-6 py-2 text-sm font-semibold rounded-md transition-colors duration-300 ${currentView === 'internship' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`}
+            className={`w-full px-6 py-2 text-sm font-semibold rounded-md transition-colors duration-300 ${currentView === 'internship' ? 'bg-white shadow dark:bg-neutral-700 text-gray-800 dark:text-white' : 'text-gray-500 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-white'}`}
           >
             Internship Analysis
           </button>
@@ -156,8 +154,8 @@ const Analysis: React.FC = () => {
         {hasValidAnalysis && dataToDisplay ? (
           <>
             <motion.div className="text-center" variants={itemVariants}>
-              <h1 className="text-3xl md:text-4xl font-bold font-sans tracking-tight text-white">{dataToDisplay.name}</h1>
-              <p className="mt-2 text-lg text-neutral-400 max-w-3xl mx-auto">{dataToDisplay.summary}</p>
+              <h1 className="text-3xl md:text-4xl font-bold font-sans tracking-tight text-gray-900 dark:text-white">{dataToDisplay.name}</h1>
+              <p className="mt-2 text-lg text-gray-600 dark:text-neutral-400 max-w-3xl mx-auto">{dataToDisplay.summary}</p>
             </motion.div>
             
             <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-8" variants={itemVariants}>
@@ -174,7 +172,7 @@ const Analysis: React.FC = () => {
             
             {validCareerPaths.length > 0 ? (
               <motion.div className="p-4 sm:p-8" variants={itemVariants}>
-                 <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 text-white">Career Deep Dive for {currentView === 'full-time' ? 'Full-Time Roles' : 'Internships'}</h2>
+                 <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 text-gray-900 dark:text-white">Career Deep Dive for {currentView === 'full-time' ? 'Full-Time Roles' : 'Internships'}</h2>
                  <div className="w-full mb-8" style={{ height: '500px' }}>
                     <CompatibilityChart paths={validCareerPaths} selectedRole={selectedPath?.role ?? null} />
                  </div>
@@ -182,11 +180,11 @@ const Analysis: React.FC = () => {
                     <select
                       value={selectedPath?.role || ''}
                       onChange={(e) => { const path = validCareerPaths.find(p => p.role === e.target.value); if (path) setSelectedPath(path); }}
-                      className="w-full appearance-none bg-[#1C1C1E] border border-neutral-700 text-white text-lg py-3 pl-4 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF2D55] transition-all"
+                      className="w-full appearance-none bg-white dark:bg-dark-card border border-gray-300 dark:border-neutral-700 text-gray-900 dark:text-white text-lg py-3 pl-4 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF2D55] transition-all"
                     >
                       {validCareerPaths.map(path => ( <option key={`${path.role}-${path.employer_name}`} value={path.role}>{path.role}</option>))}
                     </select>
-                    <ChevronDownIcon className="w-6 h-6 text-neutral-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
+                    <ChevronDownIcon className="w-6 h-6 text-gray-400 dark:text-neutral-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
                   </div>
                  <AnimatePresence mode="wait">
                     {selectedPath && <DeepDiveSection key={`${selectedPath.role}-${selectedPath.employer_name}`} path={selectedPath} />}
@@ -195,7 +193,7 @@ const Analysis: React.FC = () => {
             ) : null }
 
             <motion.div variants={itemVariants}>
-                <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 text-white">Actionable Insights</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">Actionable Insights</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <TipsPanel title="Resume Improvements" icon={<PencilSquareIcon className="w-8 h-6 text-green-400" />} tips={dataToDisplay.generalResumeImprovements} color="green" />
                     <TipsPanel title="Upskilling Suggestions" icon={<AcademicCapIcon className="w-8 h-8 text-sky-400" />} tips={dataToDisplay.generalUpskillingSuggestions} color="blue" />
@@ -204,17 +202,17 @@ const Analysis: React.FC = () => {
 
             <motion.div variants={itemVariants}>
               <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
-                <h2 className="text-2xl md:text-3xl font-bold text-white text-center md:text-left">
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white text-center md:text-left">
                   Recommended Opportunities
                 </h2>
                 <div className="relative w-full max-w-xs">
-                    <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
+                    <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-neutral-500 pointer-events-none" />
                     <input 
                       type="text"
                       placeholder="Filter opportunities..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full bg-[#1C1C1E] border border-neutral-800 text-white rounded-full py-2.5 pl-12 pr-4 focus:ring-2 focus:ring-[#FF2D55] focus:outline-none transition"
+                      className="w-full bg-white dark:bg-dark-card border border-gray-300 dark:border-neutral-800 text-gray-900 dark:text-white rounded-full py-2.5 pl-12 pr-4 focus:ring-2 focus:ring-[#FF2D55] focus:outline-none transition"
                     />
                 </div>
               </div>
@@ -226,21 +224,21 @@ const Analysis: React.FC = () => {
                 </AnimatePresence>
               </div>
               {filteredJobs.length === 0 && (
-                <p className="text-center text-neutral-500 mt-8">No job listings match your search criteria.</p>
+                <p className="text-center text-gray-500 dark:text-neutral-500 mt-8">No job listings match your search criteria.</p>
               )}
             </motion.div>
           </>
         ) : (
-          <motion.div variants={itemVariants} className="bg-[#1C1C1E] border border-amber-500/30 p-8 rounded-2xl text-center">
-            <h2 className="text-2xl font-bold text-amber-500">Analysis Incomplete</h2>
-            <p className="text-neutral-400 mt-2 max-w-2xl mx-auto">We're sorry, our AI could not generate a complete analysis from the provided resume.</p>
+          <motion.div variants={itemVariants} className="bg-amber-50 dark:bg-[#1C1C1E] border border-amber-300 dark:border-amber-500/30 p-8 rounded-2xl text-center">
+            <h2 className="text-2xl font-bold text-amber-600 dark:text-amber-500">Analysis Incomplete</h2>
+            <p className="text-amber-800 dark:text-neutral-400 mt-2 max-w-2xl mx-auto">We're sorry, our AI could not generate a complete analysis from the provided resume.</p>
             <a onClick={handleReset} className="cursor-pointer inline-block mt-6 px-6 py-2 bg-gradient-to-r from-[#FF2D55] to-[#FF5E3A] text-white font-semibold rounded-lg hover:brightness-110">
                 Try Another Analysis
             </a>
           </motion.div>
         )}
       </motion.main>
-      <footer className="text-center mt-16 text-neutral-500 text-sm">
+      <footer className="text-center mt-16 text-gray-500 dark:text-neutral-500 text-sm">
             made with ❤️ by Kaivalya Joglekar
       </footer>
     </AnimatedPage>
