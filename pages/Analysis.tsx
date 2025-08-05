@@ -42,7 +42,8 @@ const JobCard = ({ job, variants }: { job: CareerPath, variants: Variants }) => 
       initial="hidden"
       animate="visible"
       exit="hidden"
-      className="bg-white dark:bg-dark-card border border-gray-200 dark:border-neutral-800 rounded-2xl p-6 shadow-glow flex flex-col group transition-all duration-300 hover:border-brand-purple"
+      // ✅ FIXED: Updated classes to make the card background transparent with a blur effect in dark mode.
+      className="bg-white dark:bg-black/30 dark:backdrop-blur-lg border border-gray-200 dark:border-white/10 rounded-2xl p-6 shadow-glow flex flex-col group transition-all duration-300 hover:border-brand-purple"
     >
       <div className="flex-grow">
         <div className="flex justify-between items-start mb-2">
@@ -135,20 +136,27 @@ const Analysis: React.FC = () => {
 
       <motion.main key={currentView} className="space-y-16" variants={containerVariants} initial="hidden" animate="visible">
 
-        <div className="flex items-center justify-center p-1 space-x-1 bg-gray-100 dark:bg-dark-card border border-gray-200 dark:border-neutral-800 rounded-lg max-w-md mx-auto">
+        <div className="relative flex w-full max-w-sm mx-auto items-center justify-center rounded-lg bg-gray-100 dark:bg-dark-card p-1 border border-gray-200 dark:border-neutral-800">
+          <motion.div
+            layout
+            className="absolute left-1 w-[calc(50%-0.25rem)] h-[calc(100%-0.5rem)] bg-gradient-to-r from-red-500 to-pink-500 rounded-md shadow"
+            animate={{ x: currentView === 'internship' ? '100%' : '0%' }}
+            transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+          />
           <button
             onClick={() => setCurrentView('full-time')}
-            className={`w-full px-6 py-2 text-sm font-semibold rounded-md transition-colors duration-300 ${currentView === 'full-time' ? 'bg-white shadow dark:bg-neutral-700 text-gray-800 dark:text-white' : 'text-gray-500 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-white'}`}
+            className={`relative z-10 w-1/2 py-2.5 text-sm font-bold transition-colors duration-300 ${currentView === 'full-time' ? 'text-white' : 'text-gray-500 dark:text-neutral-400'}`}
           >
-            Full-Time Analysis
+            Full-Time
           </button>
           <button
             onClick={() => setCurrentView('internship')}
-            className={`w-full px-6 py-2 text-sm font-semibold rounded-md transition-colors duration-300 ${currentView === 'internship' ? 'bg-white shadow dark:bg-neutral-700 text-gray-800 dark:text-white' : 'text-gray-500 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-white'}`}
+            className={`relative z-10 w-1/2 py-2.5 text-sm font-bold transition-colors duration-300 ${currentView === 'internship' ? 'text-white' : 'text-gray-500 dark:text-neutral-400'}`}
           >
-            Internship Analysis
+            Internship
           </button>
         </div>
+
 
         {hasValidAnalysis && dataToDisplay ? (
           <>
@@ -163,7 +171,7 @@ const Analysis: React.FC = () => {
                 <SummaryCard icon={<PuzzlePieceIcon className="w-6 h-6 text-violet-500" />} title="Key Skills" items={dataToDisplay.extractedSkills} displayAs="pills" />
               </div>
             </motion.div>
-
+            
             <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-8" variants={itemVariants}>
               {dataToDisplay.experienceSummary && dataToDisplay.experienceSummary.length > 0 && <SummaryCard icon={<BriefcaseIcon className="w-6 h-6 text-violet-500" />} title="Experience Summary" items={dataToDisplay.experienceSummary} displayAs="list" />}
               {dataToDisplay.educationSummary && dataToDisplay.educationSummary.length > 0 && <SummaryCard icon={<AcademicCapIcon className="w-6 h-6 text-violet-500" />} title="Education Summary" items={dataToDisplay.educationSummary} displayAs="list" />}
@@ -238,7 +246,7 @@ const Analysis: React.FC = () => {
         )}
       </motion.main>
       <footer className="text-center mt-16 text-gray-500 dark:text-neutral-500 text-sm">
-            made with ❤️ by Kaivalya Joglekar
+            made with ❤️ by Kaivalya 
       </footer>
     </AnimatedPage>
   );
