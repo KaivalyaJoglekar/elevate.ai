@@ -63,6 +63,5 @@ async def fetch_internships_from_jsearch(query: str):
     MODIFIED: Ignores the specific skill query and uses a generic term for better results.
     The skill matching will be handled by our backend analysis.
     """
-    # Using a generic query because "skill1 skill2 intern" yields poor results.
     generic_internship_query = "Tech Intern"
     return await _fetch_from_jsearch(generic_internship_query, "INTERN")

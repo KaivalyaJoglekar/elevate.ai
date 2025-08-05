@@ -102,7 +102,6 @@ def create_analysis_for_type(resume_text: str, name: str, skills: list, job_list
     if job_listings:
         job_descriptions = [job.get('job_description', '') for job in job_listings]
         similarity_scores = calculate_keyword_similarity(set(skills), job_descriptions)
-        # MODIFIED: Removed the [:15] slice to process ALL jobs returned from the API.
         for i, job in enumerate(job_listings):
             if i < len(similarity_scores):
                 skill_gap = analyze_skill_gap(set(skills), job_descriptions[i])
@@ -164,13 +163,21 @@ async def analyze_resume_dual_endpoint(request: ResumeRequest):
             if not search_terms: search_terms.append("Software Engineer")
             primary_query = " ".join(search_terms)
             
-            print("--- Starting concurrent JSearch API calls ---")
-            results = await asyncio.gather(
-                get_api_data_with_cache(fetch_fulltime_jobs_from_jsearch, primary_query),
-                get_api_data_with_cache(fetch_internships_from_jsearch, primary_query)
-            )
-            print("--- Concurrent API calls finished ---")
-            full_time_jobs, internship_jobs = results
+            # --- START OF MODIFICATION ---
+            # Making API calls sequentially to avoid rate-limiting errors (HTTP 429).
+            print("--- Starting sequential JSearch API calls ---")
+            
+            # Call 1: Fetch Full-Time Jobs
+            full_time_jobs = await get_api_data_with_cache(fetch_fulltime_jobs_from_jsearch, primary_query)
+            
+            # Add a 1.5-second delay to respect API rate limits before the next call.
+            await asyncio.sleep(1.5) 
+            
+            # Call 2: Fetch Internship Jobs
+            internship_jobs = await get_api_data_with_cache(fetch_internships_from_jsearch, primary_query)
+            
+            print("--- Sequential API calls finished ---")
+            # --- END OF MODIFICATION ---
         
         if not full_time_jobs:
             print("No live full-time jobs found or API failed. Using static fallbacks.")
@@ -202,7 +209,6 @@ async def fetch_jobs_endpoint(request: JobSearchRequest):
         if jobs is None:
             raise HTTPException(status_code=500, detail="Failed to fetch jobs from the external API.")
         
-        # Adapt the raw data to the CareerPath structure the frontend expects
         adapted_jobs = []
         for job in jobs:
             adapted_jobs.append({
@@ -211,7 +217,6 @@ async def fetch_jobs_endpoint(request: JobSearchRequest):
                 "employer_logo": job.get("employer_logo"),
                 "job_link": job.get("job_apply_link"),
                 "description": (job.get("job_description") or "No description available.")[:150] + "...",
-                # Set defaults for fields that are calculated during the initial analysis
                 "matchPercentage": 0, 
                 "relevantSkills": [],
                 "skillsToDevelop": [],
