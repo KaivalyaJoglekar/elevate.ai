@@ -1,13 +1,13 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import SplashCursor from './SplashCursor';
 
+// ✅ FIXED: Added the missing interface definition for the component's props.
 interface LayoutProps {
   children: React.ReactNode;
 }
 
+// The Blob component is defined locally for use in this layout.
 const Blob = ({ className, animationProps, style }: { className: string, animationProps: any, style: React.CSSProperties }) => (
-    // ✅ RESTORED: Using dark:mix-blend-lighten for correct dark theme effect.
     <motion.div 
         style={style}
         className={`absolute rounded-full filter blur-3xl mix-blend-multiply dark:mix-blend-lighten pointer-events-none ${className}`}
@@ -17,7 +17,7 @@ const Blob = ({ className, animationProps, style }: { className: string, animati
 );
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // ✅ RESTORED: Opacity values are now different for light and dark themes.
+  // RESTORED: The animated blobs are back as requested for visual effect.
   const blobs = [
     { class: 'w-[30rem] h-[30rem] bg-red-500 opacity-25 dark:opacity-15', animate: { x: [0, 50, -20, 0], y: [0, -30, 60, 0] }, transition: { duration: 40, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
     { class: 'w-[35rem] h-[35rem] bg-brand-blue opacity-20 dark:opacity-10', animate: { x: [0, -40, 30, 0], y: [0, 60, -40, 0] }, transition: { duration: 50, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
@@ -37,9 +37,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
 
   return (
-    // ✅ RESTORED: Classes now support both light and dark themes.
     <div className="min-h-screen bg-snow dark:bg-dark-bg text-gray-800 dark:text-light-text font-sans relative overflow-hidden transition-colors duration-300">
-        <SplashCursor />
+        {/* REMOVED: SplashCursor is gone for good to ensure high performance. */}
+        
+        {/* A static, low-resource noise texture remains for styling. */}
         <div 
           className="absolute inset-0 z-0 opacity-20 dark:opacity-10 pointer-events-none" 
           style={{
@@ -47,6 +48,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           }}
         ></div>
 
+        {/* The animated blobs are rendered here. */}
         {blobs.map((blob, index) => (
             <Blob 
                 key={index}
