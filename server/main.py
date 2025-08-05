@@ -2,9 +2,11 @@
 
 import base64
 import uvicorn
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Literal
 
 from nlp_processor import (
     parse_pdf_text,
@@ -19,9 +21,14 @@ from nlp_processor import (
     calculate_keyword_similarity, 
     CORE_TECH_SKILLS
 )
-from jsearch_client import fetch_jobs_from_jsearch, RAPIDAPI_KEY
+from api_clients import (
+    fetch_fulltime_jobs_from_jsearch, 
+    fetch_internships_from_jsearch, 
+    RAPIDAPI_KEY
+)
 
 from datetime import datetime, timedelta
+import traceback
 
 api_cache = {}
 CACHE_DURATION = timedelta(hours=6)
@@ -34,13 +41,6 @@ STATIC_FALLBACK_FULLTIME_JOBS = [
         "employer_logo": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS_NoAHz2kYn8A2aI0cM4aS84Zz2e-QnJ-1gA&s",
         "job_apply_link": "https://www.linkedin.com/jobs/search/?keywords=Software%20Engineer%20Tata%20Consultancy%20Services&location=India"
     },
-    {
-        "job_title": "Frontend Developer", "employer_name": "Infosys", "job_employment_type": "FULLTIME",
-        "description": "Build responsive and interactive user interfaces for next-generation digital services and solutions.",
-        "job_description": "Infosys is seeking a Frontend Developer skilled in React, Angular, or Vue.js. You will collaborate with UX designers and backend teams to create modern user experiences.",
-        "employer_logo": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ7o-yS3gvv_i-s4g5p_DkYF3R2e-wZqE5F8g&s",
-        "job_apply_link": "https://www.linkedin.com/jobs/search/?keywords=Frontend%20Developer%20Infosys&location=India"
-    },
 ]
 
 STATIC_FALLBACK_INTERNSHIPS = [
@@ -51,32 +51,26 @@ STATIC_FALLBACK_INTERNSHIPS = [
         "employer_logo": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT2Xo0Q9y-p-sc_m2yL-YqGo-8s-0p_Y0gL4g&s",
         "job_apply_link": "https://www.linkedin.com/jobs/search/?keywords=Software%20Engineer%20Intern%20Microsoft&location=India"
     },
-    {
-        "job_title": "Data Science Intern", "employer_name": "Amazon", "job_employment_type": "INTERN",
-        "description": "Work with large-scale datasets to solve complex business problems through data analysis and machine learning models.",
-        "job_description": "As a Data Science Intern at Amazon, you will apply your skills in Python, R, SQL, and statistical analysis to deliver data-driven insights for one of our many business units.",
-        "employer_logo": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR6s22g3tO5m_yZ-J_a4t-M6d6N-qJ_pE-qYg&s",
-        "job_apply_link": "https://www.linkedin.com/jobs/search/?keywords=Data%20Science%20Intern%20Amazon&location=India"
-    },
 ]
 
-def get_jobs_with_cache(query: str, employment_types: str):
-    cache_key = f"{query}_{employment_types}"
+async def get_api_data_with_cache(api_function, query: str):
+    """Generic cache wrapper for our async API functions."""
+    cache_key = f"{api_function.__name__}_{query or 'all'}"
     now = datetime.now()
     
     if cache_key in api_cache:
         timestamp, data = api_cache[cache_key]
         if now - timestamp < CACHE_DURATION:
-            print(f"CACHE HIT for query: {cache_key}")
+            print(f"CACHE HIT for: {cache_key}")
             return data
             
-    print(f"CACHE MISS for query: {cache_key}. Fetching from live API.")
-    data = fetch_jobs_from_jsearch(query, employment_types)
+    print(f"CACHE MISS for: {cache_key}. Fetching from live API.")
+    data = await api_function(query)
     
-    if data:
+    if data is not None:
         api_cache[cache_key] = (now, data)
     else:
-        print(f"API call failed or returned no data for {cache_key}. No data to cache.")
+        print(f"API call for {cache_key} failed or returned None. No data to cache.")
     return data
 
 
@@ -94,6 +88,10 @@ app.add_middleware(
 class ResumeRequest(BaseModel):
     file_content: str
 
+class JobSearchRequest(BaseModel):
+    query: str
+    job_type: Literal['full-time', 'internship']
+
 def create_analysis_for_type(resume_text: str, name: str, skills: list, job_listings: list, job_type: str) -> dict:
     experience_summary = extract_section_content(resume_text, "Experience")
     education_summary = extract_section_content(resume_text, "Education")
@@ -107,7 +105,6 @@ def create_analysis_for_type(resume_text: str, name: str, skills: list, job_list
         for i, job in enumerate(job_listings[:15]):
             if i < len(similarity_scores):
                 skill_gap = analyze_skill_gap(set(skills), job_descriptions[i])
-                # ✅ FIXED: Changed all instances of .get("role") to .get("job_title") to match the API response.
                 job_title = job.get("job_title", "N/A")
                 career_paths.append({
                     "role": job_title, 
@@ -158,36 +155,29 @@ async def analyze_resume_dual_endpoint(request: ResumeRequest):
         skills = extract_skills(resume_text)
         if not skills: raise ValueError("No skills found.")
 
-        all_jobs = None
+        full_time_jobs = None
+        internship_jobs = None
+        
         if RAPIDAPI_KEY:
             search_terms = prioritized_skills[:2] if (prioritized_skills := [s for s in skills if s in CORE_TECH_SKILLS]) else skills[:2]
             if not search_terms: search_terms.append("Software Engineer")
-            
             primary_query = " ".join(search_terms)
-            all_jobs = get_jobs_with_cache(primary_query, "FULLTIME,INTERN")
-
-            if not all_jobs:
-                all_jobs = get_jobs_with_cache("Software Developer", "FULLTIME,INTERN")
-        
-        full_time_jobs = []
-        internship_jobs = []
-        if all_jobs:
-            print(f"API call was successful. Sorting {len(all_jobs)} live jobs...")
-            for job in all_jobs:
-                title = (job.get('job_title') or "").lower()
-                if "intern" in title or "internship" in title:
-                    internship_jobs.append(job)
-                else:
-                    full_time_jobs.append(job)
-            print(f"--> Sorted into {len(full_time_jobs)} full-time jobs and {len(internship_jobs)} internships.")
+            
+            print("--- Starting concurrent JSearch API calls ---")
+            results = await asyncio.gather(
+                get_api_data_with_cache(fetch_fulltime_jobs_from_jsearch, primary_query),
+                get_api_data_with_cache(fetch_internships_from_jsearch, primary_query)
+            )
+            print("--- Concurrent API calls finished ---")
+            full_time_jobs, internship_jobs = results
         
         if not full_time_jobs:
-            print("No live full-time jobs found or API failed. Using static fallbacks for 'Full-Time'.")
+            print("No live full-time jobs found or API failed. Using static fallbacks.")
             full_time_jobs = STATIC_FALLBACK_FULLTIME_JOBS
         if not internship_jobs:
-            print("No live internships found or API failed. Using static fallbacks for 'Internship'.")
+            print("No live internships found or API failed. Using static fallbacks.")
             internship_jobs = STATIC_FALLBACK_INTERNSHIPS
-        
+
         full_time_analysis = create_analysis_for_type(resume_text, name, skills, full_time_jobs, 'full-time')
         internship_analysis = create_analysis_for_type(resume_text, name, skills, internship_jobs, 'internship')
 
@@ -197,7 +187,41 @@ async def analyze_resume_dual_endpoint(request: ResumeRequest):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         print(f"An unexpected error occurred during analysis: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="An internal error occurred during analysis.")
+
+@app.post("/fetch-jobs/")
+async def fetch_jobs_endpoint(request: JobSearchRequest):
+    try:
+        if request.job_type == 'full-time':
+            jobs = await fetch_fulltime_jobs_from_jsearch(request.query)
+        else: # 'internship'
+            jobs = await fetch_internships_from_jsearch(request.query)
+        
+        if jobs is None:
+            raise HTTPException(status_code=500, detail="Failed to fetch jobs from the external API.")
+        
+        # Adapt the raw data to the CareerPath structure the frontend expects
+        adapted_jobs = []
+        for job in jobs:
+            adapted_jobs.append({
+                "role": job.get("job_title"),
+                "employer_name": job.get("employer_name"),
+                "employer_logo": job.get("employer_logo"),
+                "job_link": job.get("job_apply_link"),
+                "description": (job.get("job_description") or "No description available.")[:150] + "...",
+                # Set defaults for fields that are calculated during the initial analysis
+                "matchPercentage": 0, 
+                "relevantSkills": [],
+                "skillsToDevelop": [],
+                "skillProficiencyAnalysis": []
+            })
+        return adapted_jobs
+
+    except Exception as e:
+        print(f"An error occurred in /fetch-jobs/: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="An internal error occurred while fetching jobs.")
 
 @app.get("/")
 def read_root():

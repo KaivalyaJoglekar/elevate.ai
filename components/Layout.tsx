@@ -1,12 +1,15 @@
+// components/Layout.tsx
+
 import React from 'react';
 import { motion } from 'framer-motion';
 
-// ✅ FIXED: Added the missing interface definition for the component's props.
+// REMOVED: The import for SplashCursor is no longer needed.
+// import SplashCursor from './SplashCursor'; 
+
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-// The Blob component is defined locally for use in this layout.
 const Blob = ({ className, animationProps, style }: { className: string, animationProps: any, style: React.CSSProperties }) => (
     <motion.div 
         style={style}
@@ -17,30 +20,25 @@ const Blob = ({ className, animationProps, style }: { className: string, animati
 );
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // RESTORED: The animated blobs are back as requested for visual effect.
+  // MODIFIED: Reduced the number of blobs from 6 to 3 for better performance.
   const blobs = [
-    { class: 'w-[30rem] h-[30rem] bg-red-500 opacity-25 dark:opacity-15', animate: { x: [0, 50, -20, 0], y: [0, -30, 60, 0] }, transition: { duration: 40, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
+    { class: 'w-[30rem] h-[30rem] bg-brand-purple opacity-25 dark:opacity-15', animate: { x: [0, 30, -60, 0], y: [0, 40, -20, 0] }, transition: { duration: 45, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
     { class: 'w-[35rem] h-[35rem] bg-brand-blue opacity-20 dark:opacity-10', animate: { x: [0, -40, 30, 0], y: [0, 60, -40, 0] }, transition: { duration: 50, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
-    { class: 'w-[25rem] h-[25rem] bg-brand-purple opacity-25 dark:opacity-15', animate: { x: [0, 30, -60, 0], y: [0, 40, -20, 0] }, transition: { duration: 45, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
     { class: 'w-[30rem] h-[30rem] bg-sky-400 opacity-25 dark:opacity-15', animate: { x: [0, -50, 20, 0], y: [0, 30, -60, 0] }, transition: { duration: 42, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
-    { class: 'w-[35rem] h-[35rem] bg-pink-500 opacity-20 dark:opacity-10', animate: { x: [0, 40, -30, 0], y: [0, -60, 40, 0] }, transition: { duration: 52, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
-    { class: 'w-[25rem] h-[25rem] bg-violet-500 opacity-25 dark:opacity-15', animate: { x: [0, -30, 60, 0], y: [0, -40, 20, 0] }, transition: { duration: 48, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' } },
   ];
   
+  // MODIFIED: Adjusted positions for the 3 remaining blobs.
   const blobPositions: React.CSSProperties[] = [
     { top: '-10rem', left: '-20rem' },
-    { top: '50%', left: '-25rem', transform: 'translateY(-50%)' },
-    { bottom: '-15rem', left: '-15rem' },
+    { bottom: '-15rem', left: '10rem' },
     { top: '-12rem', right: '-22rem' },
-    { top: '50%', right: '-28rem', transform: 'translateY(-50%)' },
-    { bottom: '-18rem', right: '-12rem' },
   ];
 
   return (
     <div className="min-h-screen bg-snow dark:bg-dark-bg text-gray-800 dark:text-light-text font-sans relative overflow-hidden transition-colors duration-300">
-        {/* REMOVED: SplashCursor is gone for good to ensure high performance. */}
         
-        {/* A static, low-resource noise texture remains for styling. */}
+        {/* REMOVED: The SplashCursor component instance is gone. */}
+        
         <div 
           className="absolute inset-0 z-0 opacity-20 dark:opacity-10 pointer-events-none" 
           style={{
@@ -48,7 +46,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           }}
         ></div>
 
-        {/* The animated blobs are rendered here. */}
         {blobs.map((blob, index) => (
             <Blob 
                 key={index}
