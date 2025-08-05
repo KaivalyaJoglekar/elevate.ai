@@ -25,7 +25,7 @@ async def _fetch_from_jsearch(query: str, employment_types: str):
     params = {
         "query": query,
         "page": "1",
-        "num_pages": "1",
+        "num_pages": "2",
         "country": "in",
         "employment_types": employment_types
     }
@@ -58,5 +58,11 @@ async def fetch_fulltime_jobs_from_jsearch(query: str):
     return await _fetch_from_jsearch(f"{query} developer", "FULLTIME")
 
 async def fetch_internships_from_jsearch(query: str):
-    """Fetches internship listings from JSearch using the prominent skills from the resume."""
-    return await _fetch_from_jsearch(f"{query} intern", "INTERN")
+    """
+    Fetches internship listings from JSearch.
+    MODIFIED: Ignores the specific skill query and uses a generic term for better results.
+    The skill matching will be handled by our backend analysis.
+    """
+    # Using a generic query because "skill1 skill2 intern" yields poor results.
+    generic_internship_query = "Tech Intern"
+    return await _fetch_from_jsearch(generic_internship_query, "INTERN")

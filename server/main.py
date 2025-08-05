@@ -102,7 +102,8 @@ def create_analysis_for_type(resume_text: str, name: str, skills: list, job_list
     if job_listings:
         job_descriptions = [job.get('job_description', '') for job in job_listings]
         similarity_scores = calculate_keyword_similarity(set(skills), job_descriptions)
-        for i, job in enumerate(job_listings[:15]):
+        # MODIFIED: Removed the [:15] slice to process ALL jobs returned from the API.
+        for i, job in enumerate(job_listings):
             if i < len(similarity_scores):
                 skill_gap = analyze_skill_gap(set(skills), job_descriptions[i])
                 job_title = job.get("job_title", "N/A")
