@@ -1,8 +1,8 @@
- fastapi
- uvicorn[standard]
- pydantic
- PyMuPDF
- # REMOVED: sentence-transformers was causing memory crashes.
- requests
- python-dotenv
+# server/requirements.txt
+fastapi
+uvicorn[standard]
+pydantic
+PyMuPDF
+python-dotenv
 httpx
+google-generativeai
