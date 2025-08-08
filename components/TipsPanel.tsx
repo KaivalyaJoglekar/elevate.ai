@@ -1,5 +1,6 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+// src/components/TipsPanel.tsx
+
+import React, { memo } from 'react';
 import { CheckCircleIcon } from './icons';
 
 interface TipsPanelProps {
@@ -9,31 +10,12 @@ interface TipsPanelProps {
   color: 'green' | 'blue';
 }
 
-const TipsPanel: React.FC<TipsPanelProps> = ({ title, icon, tips, color }) => {
+const TipsPanel: React.FC<TipsPanelProps> = memo(({ title, icon, tips, color }) => {
 
   const itemColorClasses = {
     green: 'text-green-500 dark:text-green-400',
     blue: 'text-sky-500 dark:text-sky-400',
   }
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2,
-        delayChildren: 0.3,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-    },
-  };
 
   return (
     // ✅ FIXED: Added bg-white/50 for light theme and border-brand-purple/50 for the glowing border effect.
@@ -42,21 +24,18 @@ const TipsPanel: React.FC<TipsPanelProps> = ({ title, icon, tips, color }) => {
           {icon}
           <h2 className="text-2xl font-bold text-gray-800 dark:text-light-text">{title}</h2>
         </div>
-        <motion.ul 
+        <ul 
           className="space-y-4"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
         >
           {tips.map((tip, index) => (
-            <motion.li key={index} className="flex items-start gap-3" variants={itemVariants}>
+            <li key={index} className="flex items-start gap-3">
               <CheckCircleIcon className={`flex-shrink-0 w-6 h-6 mt-1 ${itemColorClasses[color]}`} />
               <span className="text-gray-600 dark:text-subtle-text">{tip}</span>
-            </motion.li>
+            </li>
           ))}
-        </motion.ul>
+        </ul>
     </div>
   );
-};
+});
 
 export default TipsPanel;

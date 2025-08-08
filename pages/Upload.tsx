@@ -1,3 +1,5 @@
+// src/pages/Upload.tsx
+
 import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone, FileRejection } from 'react-dropzone';
@@ -143,7 +145,7 @@ const Upload: React.FC = () => {
                         <button
                             onClick={handleAnalyze}
                             disabled={!file || isLoading}
-                            className="flex items-center justify-center px-10 py-3 text-lg font-semibold text-white rounded-lg transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed bg-gradient-to-br from-red-500 to-pink-500 hover:brightness-110 disabled:brightness-50"
+                            className="flex items-center justify-center px-10 py-3 text-lg font-semibold text-white rounded-lg transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed bg-gradient-to-br from-brand-purple to-pink-500 hover:brightness-110 disabled:brightness-50"
                         >
                             {isLoading ? (
                                 <>

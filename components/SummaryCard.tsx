@@ -1,5 +1,6 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+// src/components/SummaryCard.tsx
+
+import React, { memo } from 'react';
 
 interface SummaryCardProps {
   icon: React.ReactNode;
@@ -15,19 +16,7 @@ const pillColorClasses = [
     { light: 'bg-pink-100 border-pink-200 text-pink-700', dark: 'dark:bg-pink-500/10 dark:border-pink-500/20 dark:text-pink-400'}
 ];
 
-const listContainerVariants = {
-  visible: {
-    transition: { staggerChildren: 0.05 }
-  },
-  hidden: {}
-};
-
-const listItemVariants = {
-  visible: { opacity: 1, y: 0 },
-  hidden: { opacity: 0, y: 10 }
-};
-
-const SummaryCard: React.FC<SummaryCardProps> = ({ icon, title, items, displayAs = 'pills' }) => {
+const SummaryCard: React.FC<SummaryCardProps> = memo(({ icon, title, items, displayAs = 'pills' }) => {
   return (
     // ✅ FIXED: Added bg-white/50 for light theme and border-brand-purple/50 for the glowing border effect.
     <div 
@@ -37,11 +26,8 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ icon, title, items, displayAs
         {icon}
         <h2 className="text-xl font-bold text-gray-800 dark:text-light-text">{title}</h2>
       </div>
-      <motion.div 
+      <div 
         className={displayAs === 'pills' ? "flex flex-wrap gap-3" : "space-y-3"}
-        variants={listContainerVariants}
-        initial="hidden"
-        animate="visible"
       >
         {items.map((item, index) => {
           const displayText = typeof item === 'string' ? item : item?.name;
@@ -52,24 +38,24 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ icon, title, items, displayAs
           
           if (displayAs === 'list') {
             return (
-              <motion.div key={index} className="flex items-start gap-3" variants={listItemVariants}>
+              <div key={index} className="flex items-start gap-3">
                 <div className="w-1.5 h-1.5 mt-2 bg-violet-400 rounded-full shrink-0"></div>
                 <p className="text-gray-600 dark:text-subtle-text">{displayText}</p>
-              </motion.div>
+              </div>
             );
           }
           
           const color = pillColorClasses[index % pillColorClasses.length];
           const colorClass = `${color.light} ${color.dark}`;
           return (
-            <motion.div key={index} className={`text-sm font-medium px-3 py-1.5 rounded-full border ${colorClass}`} variants={listItemVariants}>
+            <div key={index} className={`text-sm font-medium px-3 py-1.5 rounded-full border ${colorClass}`}>
               <span>{displayText}</span>
-            </motion.div>
+            </div>
           );
         })}
-      </motion.div>
+      </div>
     </div>
   );
-};
+});
 
 export default SummaryCard;

@@ -1,4 +1,6 @@
-import React, { useEffect } from 'react';
+// src/components/ATSMeter.tsx
+
+import React, { useEffect, memo } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useTheme } from '../hooks/useTheme';
 
@@ -7,7 +9,7 @@ interface AtsScoreCardProps {
   feedback: string;
 }
 
-const AtsScoreCard: React.FC<AtsScoreCardProps> = ({ score, feedback }) => {
+const AtsScoreCard: React.FC<AtsScoreCardProps> = memo(({ score, feedback }) => {
   const { theme } = useTheme();
   const count = useMotionValue(0);
   const rounded = useTransform(count, Math.round);
@@ -92,6 +94,6 @@ const AtsScoreCard: React.FC<AtsScoreCardProps> = ({ score, feedback }) => {
         </div>
     </motion.div>
   );
-};
+});
 
 export default AtsScoreCard;

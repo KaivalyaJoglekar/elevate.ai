@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 
 const Blob = ({ className, animationProps, style }: { className: string, animationProps: any, style: React.CSSProperties }) => (
     <motion.div 
-        style={style}
+        style={{ ...style, willChange: 'transform' }}
         className={`absolute rounded-full filter blur-3xl mix-blend-multiply dark:mix-blend-lighten pointer-events-none hidden md:block ${className}`}
         animate={animationProps.animate}
         transition={animationProps.transition}

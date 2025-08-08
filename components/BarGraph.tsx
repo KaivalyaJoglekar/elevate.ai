@@ -1,4 +1,6 @@
-import React from 'react';
+// src/components/BarGraph.tsx
+
+import React, { memo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import type { CareerPath } from '../types';
 import { useTheme } from '../hooks/useTheme';
@@ -8,7 +10,7 @@ interface CompatibilityChartProps {
   selectedRole: string | null;
 }
 
-const CompatibilityChart: React.FC<CompatibilityChartProps> = ({ paths, selectedRole }) => {
+const CompatibilityChart: React.FC<CompatibilityChartProps> = memo(({ paths, selectedRole }) => {
   const { theme } = useTheme();
   const sortedData = [...paths].sort((a, b) => b.matchPercentage - a.matchPercentage);
   
@@ -73,6 +75,6 @@ const CompatibilityChart: React.FC<CompatibilityChartProps> = ({ paths, selected
       </BarChart>
     </ResponsiveContainer>
   );
-};
+});
 
 export default CompatibilityChart;
