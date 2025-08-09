@@ -32,7 +32,6 @@ const Upload: React.FC = () => {
     const { setAnalysis, setIsLoading, isLoading, setError, error, file, setFile, setFileName } = useResumeContext();
     const navigate = useNavigate();
     
-    // MODIFIED: Simplified the loading message logic
     const [loadingMessage, setLoadingMessage] = useState('Analyzing your resume...');
 
     const handleAnalyze = async () => {
@@ -41,13 +40,9 @@ const Upload: React.FC = () => {
         setIsLoading(true); 
         setError(null);
         setFileName(file.name);
-        // MODIFIED: Set a general message. If it's a cold start, it will take longer, but the user sees a consistent message.
         setLoadingMessage('AI analysis in progress... this may take a moment.');
 
         try {
-            // REMOVED: The separate wake-up ping is not necessary.
-            // The `analyzeResume` call will handle waking the server.
-            
             const base64Content = await readFileAsBase64(file);
             const result = await analyzeResume(base64Content);
             
@@ -55,20 +50,24 @@ const Upload: React.FC = () => {
             navigate('/analysis');
 
         } catch (err) {
-            console.error(err);
-            const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
-            // BETTER ERROR HANDLING: Provide more specific feedback for cold starts / timeouts.
+            console.error(err); // Log the actual error for developers
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+
+            // MODIFIED: Provide more user-friendly and actionable error messages
             if (errorMessage.includes('504') || errorMessage.toLowerCase().includes('timeout')) {
-              setError('The server is taking too long to respond. It might be waking up. Please try again in a moment.');
+              setError('The server is taking longer than expected. It might be waking up. Please try again in a moment.');
+            } else if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('fetch')) {
+              setError('Could not connect to the server. Please check your internet connection and try again.');
+            } else if (errorMessage.toLowerCase().includes('file processing') || errorMessage.includes('400')) {
+                setError('There was an issue with your file. Please ensure it is a valid, non-corrupted PDF and try again.');
             } else {
-              setError(errorMessage);
+              setError('An unexpected error occurred. Please try again.');
             }
         } finally {
             setIsLoading(false); 
         }
     };
 
-    // ... (onDrop and useDropzone hooks remain the same) ...
     const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
       setError(null);
       if (fileRejections.length > 0) {
@@ -95,7 +94,7 @@ const Upload: React.FC = () => {
       maxFiles: 1,
       maxSize: MAX_FILE_SIZE_BYTES,
     });
-    // ... (The rest of the JSX remains the same) ...
+
     return (
         <AnimatedPage>
           <FullScreenLoader isVisible={isLoading} message={loadingMessage} />
