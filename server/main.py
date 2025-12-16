@@ -16,8 +16,14 @@ from utils import FULL_TIME_PROMPT_TEMPLATE, INTERNSHIP_PROMPT_TEMPLATE, parse_p
 from api_clients import fetch_fulltime_jobs_from_jsearch, fetch_internships_from_jsearch
 
 app = FastAPI(title="Elevate-AI Gemini Analysis Backend")
-origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://elevate-ai-five-psi.vercel.app"]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+# Allow all origins to fix CORS issues across different deployments
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 class ResumeRequest(BaseModel):
     file_content: str
