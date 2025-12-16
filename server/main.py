@@ -91,7 +91,7 @@ async def analyze_resume_dual_endpoint(request: ResumeRequest):
         print("<-- Received responses from Gemini.")
         full_time_analysis, internship_analysis = ai_results[0], ai_results[1]
         if not full_time_analysis or not internship_analysis:
-            raise HTTPException(status_code=500, detail="AI analysis failed for one or both contexts.")
+            raise HTTPException(status_code=500, detail="AI analysis failed. Please check server logs for Gemini API errors (e.g., invalid key or quota).")
         extracted_skills = [skill['name'] for skill in full_time_analysis.get('extractedSkills', [])]
         if not extracted_skills: raise ValueError("Could not extract skills from resume to search for jobs.")
         search_query = " ".join(extracted_skills[:3])
@@ -106,7 +106,8 @@ async def analyze_resume_dual_endpoint(request: ResumeRequest):
     except Exception as e:
         print(f"An unexpected error occurred during the main workflow: {e}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail="An internal server error occurred during analysis.")
+        # Return the actual error message to the client for easier debugging
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @app.post("/fetch-jobs/")
 async def fetch_jobs_endpoint(request: JobSearchRequest):

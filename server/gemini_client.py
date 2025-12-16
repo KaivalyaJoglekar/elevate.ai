@@ -8,17 +8,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("FATAL ERROR: GEMINI_API_KEY not found in environment variables.")
 
-genai.configure(api_key=GEMINI_API_KEY)
-
-model = genai.GenerativeModel('gemini-1.5-flash-latest')
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    print("!!! WARNING: GEMINI_API_KEY not found. Gemini features will not work.")
+    model = None
 
 async def get_gemini_analysis(prompt: str) -> dict | None:
     """
     Sends a prompt to the Gemini API and robustly extracts and parses the JSON response.
     """
+    if not model:
+        print("!!! ERROR: Attempted to use Gemini API but model is not initialized (missing API key).")
+        return None
+
     try:
         print("--> Sending analysis request to Gemini 1.5 Flash...")
         response = await model.generate_content_async(
