@@ -11,6 +11,7 @@ import { readFileAsBase64 } from '../utils/fileParser';
 import { analyzeResume } from '../services/backendService';
 
 import AnimatedPage from '../components/AnimatedPage';
+import ScrollReveal from '../components/ScrollReveal';
 import ThemeToggleButton from '../components/ThemeToggleButton';
 import FullScreenLoader from '../components/FullScreenLoader';
 import { CloudArrowUpIcon, MagnifyingGlassIcon } from '../components/icons';
@@ -20,12 +21,20 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 const sectionVariants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.2 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.15 } },
 };
 
 const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 100 } },
+  hidden: { y: 30, opacity: 0 },
+  visible: { 
+    y: 0, 
+    opacity: 1, 
+    transition: { 
+      type: 'spring', 
+      stiffness: 100,
+      damping: 15
+    } 
+  },
 };
 
 const Upload: React.FC = () => {
@@ -120,23 +129,27 @@ const Upload: React.FC = () => {
                     <motion.div variants={itemVariants} className="w-full max-w-lg mt-10">
                         <div
                             {...getRootProps()}
-                            className={`relative p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 group
+                            className={`relative p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 group will-animate
                                 ${isDragActive 
                                     ? 'border-brand-purple bg-brand-purple/10 scale-105 shadow-[0_0_25px_rgba(139,92,246,0.5)]' 
-                                    : 'border-gray-300 dark:border-neutral-700 hover:border-brand-purple hover:bg-brand-purple/5'}`
+                                    : 'border-gray-300 dark:border-neutral-700 hover:border-brand-purple hover:bg-brand-purple/5 hover:shadow-lg'}`
                                 }
                         >
                             <input {...getInputProps()} />
-                            <div className="flex flex-col items-center justify-center text-center transition-transform duration-300 group-hover:scale-105">
-                                <CloudArrowUpIcon className={`h-12 w-12 text-gray-400 dark:text-subtle-text mb-4 transition-colors ${isDragActive ? 'text-brand-purple' : ''}`}/>
+                            <div className="flex flex-col items-center justify-center text-center transition-transform duration-300 group-hover:scale-105 will-animate">
+                                <CloudArrowUpIcon className={`h-12 w-12 text-gray-400 dark:text-subtle-text mb-4 transition-all duration-300 ${isDragActive ? 'text-brand-purple animate-bounce' : 'group-hover:text-brand-purple group-hover:scale-110'}`}/>
                                 <p className="text-xl font-semibold text-gray-700 dark:text-light-text">Upload Your Resume</p>
-                                <p className="text-gray-500 dark:text-subtle-text mt-1">Click or drag & drop (PDF only)</p>
+                                <p className="text-gray-500 dark:text-subtle-text mt-1">Click or drag & drop (PDF only, max {MAX_FILE_SIZE_MB}MB)</p>
                             </div>
                         </div>
                         {file && !isLoading && (
-                            <div className="text-center mt-4">
-                                <p className="text-sm text-green-600 dark:text-green-400">Selected: {file.name}</p>
-                            </div>
+                            <motion.div 
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-center mt-4"
+                            >
+                                <p className="text-sm text-green-600 dark:text-green-400 font-medium">✓ Selected: {file.name}</p>
+                            </motion.div>
                         )}
                     </motion.div>
     
@@ -144,7 +157,7 @@ const Upload: React.FC = () => {
                         <button
                             onClick={handleAnalyze}
                             disabled={!file || isLoading}
-                            className="flex items-center justify-center px-10 py-3 text-lg font-semibold text-white rounded-lg transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed bg-gradient-to-br from-brand-purple to-pink-500 hover:brightness-110 disabled:brightness-50"
+                            className="flex items-center justify-center px-10 py-3 text-lg font-semibold text-white rounded-lg transition-all transform hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed bg-gradient-to-br from-brand-purple to-pink-500 hover:brightness-110 hover:shadow-xl disabled:brightness-50 will-animate"
                         >
                             {isLoading ? (
                                 <>

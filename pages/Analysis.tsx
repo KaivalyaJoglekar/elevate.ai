@@ -9,6 +9,7 @@ import { fetchJobsByQuery } from '../services/backendService';
 import type { CareerPath, CareerData } from '../types';
 
 import AnimatedPage from '../components/AnimatedPage';
+import ScrollReveal from '../components/ScrollReveal';
 import AtsScoreCard from '../components/ATSMeter';
 import SummaryCard from '../components/SummaryCard';
 import TipsPanel from '../components/TipsPanel';
@@ -115,31 +116,32 @@ const Analysis: React.FC = () => {
         animate="visible"
       >
         <motion.div variants={itemVariants} className="text-center">
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tighter bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent dark:from-white dark:to-gray-400">{dataToDisplay.name}</h1>
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tighter bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent dark:from-white dark:to-gray-400 will-animate">{dataToDisplay.name}</h1>
             <p className="mt-4 text-lg text-gray-600 dark:text-neutral-400 max-w-3xl mx-auto">{dataToDisplay.summary}</p>
         </motion.div>
 
         <motion.div variants={itemVariants} className="relative flex w-full max-w-sm mx-auto items-center justify-center rounded-lg bg-gray-100 dark:bg-dark-card p-1 border border-gray-200 dark:border-neutral-800">
-            <motion.div layout className="absolute left-1 w-[calc(50%-0.25rem)] h-[calc(100%-0.5rem)] bg-gradient-to-r from-brand-purple to-pink-500 rounded-md shadow" animate={{ x: currentView === 'internship' ? '100%' : '0%' }} transition={{ type: 'spring', stiffness: 400, damping: 35 }} />
+            <motion.div layout className="absolute left-1 w-[calc(50%-0.25rem)] h-[calc(100%-0.5rem)] bg-gradient-to-r from-brand-purple to-pink-500 rounded-md shadow will-animate" animate={{ x: currentView === 'internship' ? '100%' : '0%' }} transition={{ type: 'spring', stiffness: 400, damping: 35 }} />
             <button onClick={() => setCurrentView('full-time')} className={`relative z-10 w-1/2 py-2.5 text-sm font-bold transition-colors duration-300 ${currentView === 'full-time' ? 'text-white' : 'text-gray-500 dark:text-neutral-400'}`}>Full-Time</button>
             <button onClick={() => setCurrentView('internship')} className={`relative z-10 w-1/2 py-2.5 text-sm font-bold transition-colors duration-300 ${currentView === 'internship' ? 'text-white' : 'text-gray-500 dark:text-neutral-400'}`}>Internship</button>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2 space-y-8">
-                <motion.div variants={itemVariants}><SummaryCard icon={<PuzzlePieceIcon className="w-6 h-6 text-pink-500" />} title="Key Skills" items={dataToDisplay.extractedSkills || []} displayAs="pills" /></motion.div>
-                <motion.div variants={itemVariants}><TipsPanel title="Resume Improvements" icon={<PencilSquareIcon className="w-8 h-6 text-green-400" />} tips={dataToDisplay.generalResumeImprovements || []} color="green" /></motion.div>
-                <motion.div variants={itemVariants}><TipsPanel title="Upskilling Suggestions" icon={<AcademicCapIcon className="w-8 h-8 text-sky-400" />} tips={dataToDisplay.generalUpskillingSuggestions || []} color="blue" /></motion.div>
+                <ScrollReveal delay={0.1}><SummaryCard icon={<PuzzlePieceIcon className="w-6 h-6 text-pink-500" />} title="Key Skills" items={dataToDisplay.extractedSkills || []} displayAs="pills" /></ScrollReveal>
+                <ScrollReveal delay={0.2}><TipsPanel title="Resume Improvements" icon={<PencilSquareIcon className="w-8 h-6 text-green-400" />} tips={dataToDisplay.generalResumeImprovements || []} color="green" /></ScrollReveal>
+                <ScrollReveal delay={0.3}><TipsPanel title="Upskilling Suggestions" icon={<AcademicCapIcon className="w-8 h-8 text-sky-400" />} tips={dataToDisplay.generalUpskillingSuggestions || []} color="blue" /></ScrollReveal>
             </div>
             <div className="space-y-8 lg:sticky lg:top-24">
-                <motion.div variants={itemVariants}><AtsScoreCard score={dataToDisplay.atsScore.score} feedback={dataToDisplay.atsScore.feedback} /></motion.div>
-                <motion.div variants={itemVariants}>{dataToDisplay.experienceSummary?.length > 0 && <SummaryCard icon={<BriefcaseIcon className="w-6 h-6 text-pink-500" />} title="Experience" items={dataToDisplay.experienceSummary} displayAs="list" />}</motion.div>
-                <motion.div variants={itemVariants}>{dataToDisplay.educationSummary?.length > 0 && <SummaryCard icon={<AcademicCapIcon className="w-6 h-6 text-pink-500" />} title="Education" items={dataToDisplay.educationSummary} displayAs="list" />}</motion.div>
+                <ScrollReveal delay={0.1} direction="left"><AtsScoreCard score={dataToDisplay.atsScore.score} feedback={dataToDisplay.atsScore.feedback} /></ScrollReveal>
+                <ScrollReveal delay={0.2} direction="left">{dataToDisplay.experienceSummary?.length > 0 && <SummaryCard icon={<BriefcaseIcon className="w-6 h-6 text-pink-500" />} title="Experience" items={dataToDisplay.experienceSummary} displayAs="list" />}</ScrollReveal>
+                <ScrollReveal delay={0.3} direction="left">{dataToDisplay.educationSummary?.length > 0 && <SummaryCard icon={<AcademicCapIcon className="w-6 h-6 text-pink-500" />} title="Education" items={dataToDisplay.educationSummary} displayAs="list" />}</ScrollReveal>
             </div>
         </div>
 
         {chartPaths?.length > 0 ? (
-          <motion.div variants={itemVariants} className="space-y-8 rounded-2xl bg-white/50 dark:bg-dark-card/50 border border-gray-200 dark:border-neutral-800 p-4 sm:p-8">
+          <ScrollReveal>
+            <div className="space-y-8 rounded-2xl bg-white/50 dark:bg-dark-card/50 border border-gray-200 dark:border-neutral-800 p-4 sm:p-8">
              <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 dark:text-white">Career Path Deep Dive</h2>
              <div className="relative mx-auto max-w-lg">
                 <select value={selectedPath?.role || ''} onChange={(e) => { const path = chartPaths.find(p => p.role === e.target.value); if (path) setSelectedPath(path); }} className="w-full appearance-none rounded-lg border border-gray-300 bg-white py-3 pl-4 pr-10 text-lg text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-pink-500 dark:border-neutral-700 dark:bg-dark-card dark:text-white">
@@ -152,24 +154,32 @@ const Analysis: React.FC = () => {
                     <CompatibilityChart paths={chartPaths} selectedRole={selectedPath?.role ?? null} />
                 </div>
               </Suspense>
-             <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait">
                 {selectedPath && (
                     <Suspense fallback={<div className="w-full h-[450px] bg-gray-200/50 dark:bg-dark-card/20 rounded-lg animate-pulse mt-8" />}>
                         <DeepDiveSection key={selectedPath.role} path={selectedPath} />
                     </Suspense>
                 )}
-             </AnimatePresence>
-          </motion.div>
+              </AnimatePresence>
+          </div>
+          </ScrollReveal>
         ) : null }
         
-        <motion.div variants={itemVariants} className="space-y-12">
+        <ScrollReveal delay={0.1}>
+          <div className="space-y-12">
             <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 dark:text-white">Recommended Opportunities</h2>
             {displayedJobs?.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{displayedJobs.map((job) => ( <JobCard key={`${job.role}-${job.employer_name}-${job.job_link}`} job={job} /> ))}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayedJobs.map((job, index) => ( 
+                    <ScrollReveal key={`${job.role}-${job.employer_name}-${job.job_link}`} delay={index * 0.1} direction="up">
+                      <JobCard job={job} />
+                    </ScrollReveal>
+                  ))}
+                </div>
             ) : (
                 <div className="text-center py-12"><h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">No Job Opportunities Found</h2><p className="text-gray-500 dark:text-neutral-400 mt-2">Try a new search below to discover more opportunities.</p></div>
             )}
-            <div className="mt-16 text-center bg-white/30 dark:bg-black/20 border border-gray-200 dark:border-neutral-800 p-8 rounded-2xl">
+            <div className="mt-16 text-center bg-white/30 dark:bg-black/20 border border-gray-200 dark:border-neutral-800 p-8 rounded-2xl smooth-transition hover:shadow-lg">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Find More Roles</h3>
               <p className="text-gray-600 dark:text-neutral-400 mt-2">Search for a different role or technology.</p>
               <div className="flex items-center gap-2 w-full max-w-md mx-auto mt-6">
@@ -177,11 +187,12 @@ const Analysis: React.FC = () => {
                   <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-neutral-500 pointer-events-none" />
                   <input type="text" placeholder="e.g., 'Data Scientist', 'React Native'" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleJobSearch()} className="w-full bg-white dark:bg-dark-card border border-gray-300 dark:border-neutral-700 text-gray-900 dark:text-white rounded-full py-3 pl-12 pr-4 focus:ring-2 focus:ring-pink-500 focus:outline-none transition" />
                 </div>
-                <button onClick={handleJobSearch} disabled={isSearching || !searchTerm.trim()} className="px-6 py-3 bg-gradient-to-r from-brand-purple to-pink-500 text-white font-semibold rounded-full hover:brightness-110 transform transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">Search</button>
+                <button onClick={handleJobSearch} disabled={isSearching || !searchTerm.trim()} className="px-6 py-3 bg-gradient-to-r from-brand-purple to-pink-500 text-white font-semibold rounded-full hover:brightness-110 transform transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 will-animate">Search</button>
               </div>
               {jobSearchError && ( <p className="text-red-500 dark:text-red-400 mt-4 text-sm">{jobSearchError}</p> )}
             </div>
-        </motion.div>
+          </div>
+        </ScrollReveal>
       </motion.main>
       <footer className="text-center mt-16 text-gray-500 dark:text-neutral-500 text-sm"> made with ❤️ by Kaivalya </footer>
     </AnimatedPage>
