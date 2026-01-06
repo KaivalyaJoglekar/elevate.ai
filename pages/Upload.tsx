@@ -1,6 +1,6 @@
 // src/pages/Upload.tsx
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone, FileRejection } from 'react-dropzone';
 import { motion } from 'framer-motion';
@@ -18,6 +18,17 @@ import { CloudArrowUpIcon, MagnifyingGlassIcon } from '../components/icons';
 
 const MAX_FILE_SIZE_MB = 2;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+const LOADING_MESSAGES = [
+  "Reading your resume...",
+  "Extracting skills and experience...",
+  "Consulting Gemini AI for career insights...",
+  "Analyzing ATS compatibility...",
+  "Searching live job markets...",
+  "Comparing your profile against industry standards...",
+  "Generating personalized career advice...",
+  "Finalizing your report..."
+];
 
 const sectionVariants = {
   hidden: { opacity: 0 },
@@ -40,25 +51,67 @@ const itemVariants = {
 const Upload: React.FC = () => {
     const { setAnalysis, setIsLoading, isLoading, setError, error, file, setFile, setFileName } = useResumeContext();
     const navigate = useNavigate();
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                console.log('Aborting current analysis request due to unmount');
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
     
-    const [loadingMessage, setLoadingMessage] = useState('Analyzing your resume...');
+    // Use an index to track which message to show
+    const [messageIndex, setMessageIndex] = useState(0);
+
+    // Cycle through messages while loading
+    React.useEffect(() => {
+        if (!isLoading) {
+            setMessageIndex(0);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            setMessageIndex((prev) => {
+                if (prev < LOADING_MESSAGES.length - 1) {
+                    return prev + 1;
+                }
+                return prev;
+            });
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [isLoading]);
 
     const handleAnalyze = async () => {
         if (!file) return;
+
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
         
         setIsLoading(true); 
         setError(null);
         setFileName(file.name);
-        setLoadingMessage('AI analysis in progress... this may take a moment.');
+        setMessageIndex(0);
 
         try {
             const base64Content = await readFileAsBase64(file);
-            const result = await analyzeResume(base64Content);
+            const result = await analyzeResume(base64Content, controller.signal);
             
             setAnalysis(result);
             navigate('/analysis');
 
         } catch (err) {
+            if (err instanceof Error && err.name === 'AbortError') {
+                console.log('Analysis request cancelled');
+                return;
+            }
+
             console.error(err); // Log the actual error for developers
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
 
@@ -106,7 +159,7 @@ const Upload: React.FC = () => {
 
     return (
         <AnimatedPage>
-          <FullScreenLoader isVisible={isLoading} message={loadingMessage} />
+          <FullScreenLoader isVisible={isLoading} message={LOADING_MESSAGES[messageIndex]} />
           <div className="min-h-screen text-gray-800 dark:text-light-text flex flex-col items-center">
             <header className="w-full max-w-6xl mx-auto flex justify-end items-center py-4 px-4 sm:px-0">
                 <ThemeToggleButton />

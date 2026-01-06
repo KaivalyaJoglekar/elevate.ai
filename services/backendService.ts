@@ -6,12 +6,14 @@ const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
 export const analyzeResume = async (
   fileContent: string,
+  signal?: AbortSignal
 ): Promise<DualAnalysisData> => {
   try {
     const response = await fetch(`${BACKEND_URL}/analyze-resume-dual/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file_content: fileContent }),
+      signal,
     });
 
     if (!response.ok) {
