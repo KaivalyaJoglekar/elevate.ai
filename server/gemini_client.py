@@ -1,9 +1,10 @@
 # server/gemini_client.py
 
 import os
-import google.generativeai as genai
 import json
 import asyncio
+from google import genai
+from google.genai import errors, types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,59 +12,71 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('models/gemini-2.5-flash')
+    client = genai.Client(api_key=GEMINI_API_KEY)
 else:
-    print("!!! WARNING: GEMINI_API_KEY not found. Gemini features will not work.")
-    model = None
+    print("!!! WARNING: GEMINI_API_KEY not found. AI analysis will not work.")
+    client = None
 
-async def get_gemini_analysis(prompt: str) -> dict | None:
+async def get_dual_analysis(prompt: str) -> dict | None:
     """
-    Sends a prompt to the Gemini API and robustly extracts and parses the JSON response.
-    Includes retry logic for rate limits (429).
+    Sends a single merged prompt to the AI and returns the dual-analysis JSON.
+    Retries up to 3 times for rate-limit (429) or malformed-JSON errors.
     """
-    if not model:
-        print("!!! ERROR: Attempted to use Gemini API but model is not initialized (missing API key).")
+    if not client:
+        print("!!! ERROR: AI model not initialised (missing API key).")
         return None
 
-    retries = 3
+    retries   = 3
     base_delay = 2
 
     for attempt in range(retries):
         try:
-            print(f"--> Sending analysis request to Gemini (Attempt {attempt + 1}/{retries})...")
-            response = await model.generate_content_async(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    response_mime_type="application/json"
-                )
+            print(f"--> Sending dual-analysis request to AI (attempt {attempt + 1}/{retries})…")
+            response = await client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
             )
-            print("<-- Received a valid response from Gemini.")
-            
-            text_response = response.text
-            json_start = text_response.find('{')
-            json_end = text_response.rfind('}') + 1
-            
+            print("<-- Received response from AI.")
+
+            text = response.text
+
+            # Robustly extract JSON regardless of any accidental wrapping
+            json_start = text.find('{')
+            json_end   = text.rfind('}') + 1
+
             if json_start == -1 or json_end == 0:
-                print(f"!!! PARSING FAILED: Could not find a valid JSON object in the response.")
-                return None
-                
-            json_string = text_response[json_start:json_end]
-            return json.loads(json_string)
+                raise ValueError("No valid JSON object found in AI response.")
+
+            data = json.loads(text[json_start:json_end])
+
+            # Validate top-level shape
+            if 'full_time_analysis' not in data or 'internship_analysis' not in data:
+                raise ValueError("AI response missing required top-level keys.")
+
+            return data
 
         except Exception as e:
-            error_msg = str(e)
-            is_json_error = "Expecting" in error_msg or "JSON" in error_msg or isinstance(e, json.JSONDecodeError)
-            
-            if "429" in error_msg or "Quota exceeded" in error_msg or is_json_error:
-                if attempt < retries - 1:
-                    wait_time = base_delay * (2 ** attempt)
-                    reason = "Rate Limit" if "429" in error_msg else "Malformed JSON"
-                    print(f"!!! {reason} error. Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{retries})")
-                    await asyncio.sleep(wait_time)
-                    continue
-            
-            print(f"!!! CRITICAL: An error occurred while calling the Gemini API: {e}")
+            msg = str(e)
+            retriable = (
+                "429"            in msg
+                or "Quota"       in msg
+                or "JSON"        in msg
+                or "Expecting"   in msg
+                or (isinstance(e, errors.APIError) and e.code in {429, 500, 503})
+                or isinstance(e, (json.JSONDecodeError, ValueError))
+            )
+
+            if retriable and attempt < retries - 1:
+                wait = base_delay * (2 ** attempt)
+                reason = "Rate limit" if "429" in msg or "Quota" in msg else "Parse error"
+                print(f"!!! {reason}. Retrying in {wait}s… (attempt {attempt + 1}/{retries})")
+                await asyncio.sleep(wait)
+                continue
+
+            print(f"!!! CRITICAL – AI error: {e}")
             return None
-            
+
     return None

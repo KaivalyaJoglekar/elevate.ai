@@ -1,13 +1,13 @@
 [build]
   builder = "nixpacks"
-  buildCommand = "cd server && npm install"
+  buildCommand = "cd server && pip install -r requirements.txt"
 
 [deploy]
-  startCommand = "cd server && npm start"
+  startCommand = "cd server && uvicorn main:app --host 0.0.0.0 --port $PORT"
   restartPolicyType = "always"
 
 [environment]
-  NODE_ENV = "production"
+  PYTHONUNBUFFERED = "1"
 
 # Tell Railway to only deploy the server directory
 [paths]

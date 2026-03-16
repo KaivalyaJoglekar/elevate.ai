@@ -11,29 +11,27 @@ interface TipsPanelProps {
 }
 
 const TipsPanel: React.FC<TipsPanelProps> = memo(({ title, icon, tips, color }) => {
-
   const itemColorClasses = {
-    green: 'text-green-500 dark:text-green-400',
-    blue: 'text-sky-500 dark:text-sky-400',
-  }
+    green: 'text-emerald-400',
+    blue: 'text-accent-secondary',
+  };
 
   return (
-    // ✅ FIXED: Added bg-white/50 for light theme and border-brand-purple/50 for the glowing border effect.
-    <div className="bg-white/50 dark:bg-transparent border border-brand-purple/50 dark:border-neutral-800 rounded-2xl p-6 h-full shadow-glow">
-        <div className="flex items-center gap-4 mb-4">
+    <div className="bg-black/45 rounded-2xl border border-white/[0.08] h-full p-8 transition-all duration-300 hover:border-accent-secondary/30">
+      <div className="flex items-center gap-4 mb-6">
+        <div className="rounded-xl border border-white/[0.06] p-2.5 bg-black/30 shadow-sm">
           {icon}
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-light-text">{title}</h2>
         </div>
-        <ul 
-          className="space-y-4"
-        >
-          {tips.map((tip, index) => (
-            <li key={index} className="flex items-start gap-3">
-              <CheckCircleIcon className={`flex-shrink-0 w-6 h-6 mt-1 ${itemColorClasses[color]}`} />
-              <span className="text-gray-600 dark:text-subtle-text">{tip}</span>
-            </li>
-          ))}
-        </ul>
+        <h2 className="font-display text-xl font-bold text-light-text">{title}</h2>
+      </div>
+      <ul className="space-y-4">
+        {tips.map((tip, index) => (
+          <li key={index} className="flex items-start gap-4 p-4 rounded-xl border border-white/[0.06] bg-black/25 transition-colors hover:border-accent-secondary/25 hover:bg-black/35">
+            <CheckCircleIcon className={`flex-shrink-0 w-5 h-5 mt-0.5 ${itemColorClasses[color]}`} />
+            <span className="text-[15px] leading-relaxed text-light-text font-medium">{tip}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 });

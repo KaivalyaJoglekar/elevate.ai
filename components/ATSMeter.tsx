@@ -1,8 +1,7 @@
-// src/components/ATSMeter.tsx
+// components/ATSMeter.tsx
 
 import React, { useEffect, memo } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-import { useTheme } from '../hooks/useTheme';
 
 interface AtsScoreCardProps {
   score: number;
@@ -10,88 +9,120 @@ interface AtsScoreCardProps {
 }
 
 const AtsScoreCard: React.FC<AtsScoreCardProps> = memo(({ score, feedback }) => {
-  const { theme } = useTheme();
   const count = useMotionValue(0);
   const rounded = useTransform(count, Math.round);
 
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
 
-  const scoreColor = score > 85 ? 'text-green-500 dark:text-green-400' : score > 70 ? 'text-sky-500 dark:text-sky-400' : 'text-violet-500 dark:text-violet-400';
+  const isHighScore = score > 85;
+  const isMidScore = score > 70;
+
+  const scoreColor = isHighScore
+    ? 'text-emerald-400'
+    : isMidScore
+      ? 'text-accent-secondary'
+      : 'text-orange-400';
+
+  const scoreLabelColor = isHighScore
+    ? 'text-emerald-400'
+    : isMidScore
+      ? 'text-accent-secondary'
+      : 'text-orange-400';
+
+  const progressArcColor = isHighScore
+    ? '#34d399'
+    : isMidScore
+      ? '#22d3ee'
+      : '#fb923c';
+
+  const scoreLabel = isHighScore ? 'Excellent' : isMidScore ? 'Good' : 'Needs Work';
 
   useEffect(() => {
     const controls = animate(count, score, {
-      duration: 2,
-      delay: 0.5, // Start animation slightly after the card appears
-      ease: [0.16, 1, 0.3, 1], // A more dramatic ease-out curve
+      duration: 2.2,
+      delay: 0.5,
+      ease: [0.16, 1, 0.3, 1],
     });
     return controls.stop;
   }, [score, count]);
 
   return (
-    <motion.div 
-      className="bg-white/50 dark:bg-transparent border border-brand-purple/50 dark:border-neutral-800 rounded-2xl p-6 h-full shadow-glow"
-      whileHover={{ scale: 1.02, y: -5 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+    <motion.div
+      className="bg-black/45 rounded-2xl border border-white/[0.08] relative h-full overflow-hidden p-6 transition-all duration-300 hover:border-accent-secondary/30"
+      whileHover={{ y: -4 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 18 }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-        <motion.h2 
-          className="text-xl font-bold text-center mb-4 text-gray-800 dark:text-light-text"
+      <div className="relative z-10">
+        <motion.h2
+          className="mb-5 text-center font-display text-lg font-bold text-light-text"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, transition: { delay: 0.2 } }}
         >
           ATS Compatibility
         </motion.h2>
-        <div className="flex flex-col items-center gap-6">
-          <motion.div 
-            className="relative w-40 h-40 shrink-0"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1, transition: { delay: 0.4, duration: 0.5 } }}
+
+        <div className="flex flex-col items-center gap-5">
+          {/* Circular gauge */}
+          <motion.div
+            className="relative w-44 h-44"
+            initial={{ scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1, transition: { delay: 0.35, duration: 0.55, ease: [0.16, 1, 0.3, 1] } }}
           >
             <svg className="w-full h-full" viewBox="0 0 160 160">
-              {/* ✅ FIXED: Replaced the gradient with a more vibrant, multi-color diagonal one. */}
-              <defs>
-                <linearGradient id="cool-ats-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                  <stop offset="0%" style={{ stopColor: '#8b5cf6' }} />   {/* Violet-500 */}
-                  <stop offset="50%" style={{ stopColor: '#ec4899' }} />  {/* Pink-500 */}
-                  <stop offset="100%" style={{ stopColor: '#f97316' }} /> {/* Orange-500 */}
-                </linearGradient>
-              </defs>
+              {/* Track */}
               <circle
                 cx="80" cy="80" r={radius}
-                fill="none" stroke={theme === 'dark' ? "#262626" : "#e5e7eb"} strokeWidth="12"
+                fill="none"
+                stroke="rgba(255,255,255,0.08)"
+                strokeWidth="12"
               />
+              {/* Progress arc */}
               <motion.circle
                 cx="80" cy="80" r={radius}
                 fill="none"
-                stroke="url(#cool-ats-gradient)"
+                stroke={progressArcColor}
                 strokeWidth="12"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
                 initial={{ strokeDashoffset: circumference }}
                 animate={{ strokeDashoffset: circumference - (score / 100) * circumference }}
-                transition={{ duration: 2, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 2.2, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
                 transform="rotate(-90 80 80)"
               />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <motion.span 
-                  className={`text-4xl font-bold ${scoreColor}`}
-              >
+
+            {/* Centre label */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
+              <motion.span className={`text-5xl font-black tabular-nums ${scoreColor}`}>
                 {rounded}
               </motion.span>
-              <span className="text-sm font-medium text-gray-500 dark:text-subtle-text">/ 100</span>
+              <span className="text-[10px] font-bold text-slate-500 tracking-[0.15em] uppercase mt-1">/ 100</span>
             </div>
           </motion.div>
-          <motion.div 
-            className="text-center"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0, transition: { delay: 1.2 } }}
+
+          {/* Score label badge */}
+          <motion.span
+            className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide border ${scoreLabelColor}
+              ${isHighScore ? 'bg-emerald-500/10 border-emerald-500/30' : isMidScore ? 'bg-accent-secondary/10 border-accent-secondary/30' : 'bg-orange-500/10 border-orange-500/30'}`}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1, transition: { delay: 1.2 } }}
           >
-              <p className="text-gray-600 dark:text-subtle-text">{feedback}</p>
-          </motion.div>
+            {scoreLabel}
+          </motion.span>
+
+          {/* Feedback */}
+          <motion.p
+            className="text-[15px] font-medium text-center text-light-text leading-relaxed"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0, transition: { delay: 1.3 } }}
+          >
+            {feedback}
+          </motion.p>
         </div>
+      </div>
     </motion.div>
   );
 });

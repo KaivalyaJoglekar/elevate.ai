@@ -1,6 +1,7 @@
-// src/components/SummaryCard.tsx
+// components/SummaryCard.tsx
 
 import React, { memo } from 'react';
+import { motion } from 'framer-motion';
 
 interface SummaryCardProps {
   icon: React.ReactNode;
@@ -9,52 +10,72 @@ interface SummaryCardProps {
   displayAs?: 'pills' | 'list';
 }
 
-const pillColorClasses = [
-    { light: 'bg-violet-100 border-violet-200 text-violet-700', dark: 'dark:bg-violet-500/10 dark:border-violet-500/20 dark:text-violet-300'},
-    { light: 'bg-sky-100 border-sky-200 text-sky-700', dark: 'dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-300'},
-    { light: 'bg-green-100 border-green-200 text-green-700', dark: 'dark:bg-green-500/10 dark:border-green-500/20 dark:text-green-300'},
-    { light: 'bg-pink-100 border-pink-200 text-pink-700', dark: 'dark:bg-pink-500/10 dark:border-pink-500/20 dark:text-pink-400'}
+const pillPalette = [
+  'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+  'bg-accent-secondary/10 border-accent-secondary/20 text-accent-secondary',
+  'bg-accent-primary/10 border-accent-primary/20 text-accent-primary',
+  'bg-orange-500/10 border-orange-500/20 text-orange-400',
+  'bg-pink-500/10 border-pink-500/20 text-pink-400',
 ];
+
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.04 } },
+};
+
+const childVariants = {
+  hidden: { opacity: 0, scale: 0.85, y: 6 },
+  visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 18 } },
+};
 
 const SummaryCard: React.FC<SummaryCardProps> = memo(({ icon, title, items, displayAs = 'pills' }) => {
   return (
-    // ✅ FIXED: Added bg-white/50 for light theme and border-brand-purple/50 for the glowing border effect.
-    <div 
-      className="bg-white/50 dark:bg-transparent border border-brand-purple/50 dark:border-neutral-800 rounded-2xl p-6 h-full shadow-glow"
+    <motion.div
+      className="bg-black/45 rounded-2xl border border-white/[0.08] relative h-full overflow-hidden p-8 transition-all duration-300 hover:border-accent-secondary/30"
+      whileHover={{ y: -3 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 22 }}
     >
-      <div className="flex items-center gap-3 mb-4">
-        {icon}
-        <h2 className="text-xl font-bold text-gray-800 dark:text-light-text">{title}</h2>
-      </div>
-      <div 
-        className={displayAs === 'pills' ? "flex flex-wrap gap-3" : "space-y-3"}
-      >
-        {items.map((item, index) => {
-          const displayText = typeof item === 'string' ? item : item?.name;
+      <div className="relative z-10">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="rounded-xl border border-white/[0.06] bg-black/30 p-2.5 shadow-sm">
+            {icon}
+          </div>
+          <h2 className="font-display text-xl font-bold text-light-text">{title}</h2>
+        </div>
 
-          if (!displayText) {
-            return null;
-          }
-          
-          if (displayAs === 'list') {
+        <motion.div
+          className={displayAs === 'pills' ? 'flex flex-wrap gap-2.5' : 'space-y-4'}
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {items.map((item, index) => {
+            const text = typeof item === 'string' ? item : item?.name;
+            if (!text) return null;
+
+            if (displayAs === 'list') {
+              return (
+                <motion.div key={index} variants={childVariants} className="flex items-start gap-4 p-4 rounded-xl border border-white/[0.06] bg-black/25">
+                  <div className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-accent-primary" />
+                  <p className="text-[15px] leading-relaxed text-light-text font-medium">{text}</p>
+                </motion.div>
+              );
+            }
+
+            const cls = pillPalette[index % pillPalette.length];
             return (
-              <div key={index} className="flex items-start gap-3">
-                <div className="w-1.5 h-1.5 mt-2 bg-violet-400 rounded-full shrink-0"></div>
-                <p className="text-gray-600 dark:text-subtle-text">{displayText}</p>
-              </div>
+              <motion.div
+                key={index}
+                variants={childVariants}
+                className={`text-[11px] font-bold tracking-wide uppercase px-3 py-1.5 rounded-full border backdrop-blur-sm ${cls}`}
+              >
+                {text}
+              </motion.div>
             );
-          }
-          
-          const color = pillColorClasses[index % pillColorClasses.length];
-          const colorClass = `${color.light} ${color.dark}`;
-          return (
-            <div key={index} className={`text-sm font-medium px-3 py-1.5 rounded-full border ${colorClass}`}>
-              <span>{displayText}</span>
-            </div>
-          );
-        })}
+          })}
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 });
 

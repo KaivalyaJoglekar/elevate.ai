@@ -1,0 +1,16 @@
+export { Header } from './Header';
+export { Hero } from './Hero';
+export { Marquee } from './Marquee';
+export { About } from './About';
+export { Work } from './Work';
+export { Experience } from './Experience';
+export { Contact } from './Contact';
+export { Footer } from './Footer';
+export { Preloader } from './Preloader';
+export { CustomCursor } from './CustomCursor';
+export { ScrollProgress } from './ScrollProgress';
+export { GradientMesh } from './GradientMesh';
+export { CircularText, RotatingBadge } from './CircularText';
+export { TextScramble, GlitchText } from './TextEffects';
+export { HorizontalShowcase } from './HorizontalShowcase';
+export { SplitReveal } from './SplitReveal';

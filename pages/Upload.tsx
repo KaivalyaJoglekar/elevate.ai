@@ -1,250 +1,271 @@
-// src/pages/Upload.tsx
-
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone, FileRejection } from 'react-dropzone';
-import { motion } from 'framer-motion';
-import { ArrowPathIcon } from '@heroicons/react/24/solid';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useMutation } from '@tanstack/react-query';
 
 import { useResumeContext } from '../hooks/useResumeContext';
 import { readFileAsBase64 } from '../utils/fileParser';
 import { analyzeResume } from '../services/backendService';
 
 import AnimatedPage from '../components/AnimatedPage';
-import ScrollReveal from '../components/ScrollReveal';
-import ThemeToggleButton from '../components/ThemeToggleButton';
 import FullScreenLoader from '../components/FullScreenLoader';
-import { CloudArrowUpIcon, MagnifyingGlassIcon } from '../components/icons';
+import { CloudArrowUpIcon, MagnifyingGlassIcon, SparklesIcon } from '../components/icons';
 
 const MAX_FILE_SIZE_MB = 2;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const STEP_TIMING_MS = [0, 3200, 7400, 11200];
 
-const LOADING_MESSAGES = [
-  "Reading your resume...",
-  "Extracting skills and experience...",
-  "Consulting Gemini AI for career insights...",
-  "Analyzing ATS compatibility...",
-  "Searching live job markets...",
-  "Comparing your profile against industry standards...",
-  "Generating personalized career advice...",
-  "Finalizing your report..."
+const metrics = [
+    { label: 'Signal Extraction', value: '97%' },
+    { label: 'Role Matches', value: '10+' },
+    { label: 'ATS Evaluation', value: 'Real-time' },
 ];
 
-const sectionVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.15 } },
+const staggerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.15 } },
 };
 
 const itemVariants = {
-  hidden: { y: 30, opacity: 0 },
-  visible: { 
-    y: 0, 
-    opacity: 1, 
-    transition: { 
-      type: 'spring', 
-      stiffness: 100,
-      damping: 15
-    } 
-  },
+    hidden: { y: 26, opacity: 0 },
+    visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 90, damping: 16 } },
 };
 
 const Upload: React.FC = () => {
-    const { setAnalysis, setIsLoading, isLoading, setError, error, file, setFile, setFileName } = useResumeContext();
+    const { setAnalysis, setIsLoading, setError, error, file, setFile, setFileName } = useResumeContext();
     const navigate = useNavigate();
-    const abortControllerRef = useRef<AbortController | null>(null);
 
-    // Cleanup on unmount
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const stepTimerRef = useRef<number[]>([]);
+    const [activeStep, setActiveStep] = useState(0);
+
+    const clearStepTimers = useCallback(() => {
+        stepTimerRef.current.forEach(id => window.clearTimeout(id));
+        stepTimerRef.current = [];
+    }, []);
+
     useEffect(() => {
         return () => {
-            if (abortControllerRef.current) {
-                console.log('Aborting current analysis request due to unmount');
-                abortControllerRef.current.abort();
-            }
+            abortControllerRef.current?.abort();
+            clearStepTimers();
         };
-    }, []);
-    
-    // Use an index to track which message to show
-    const [messageIndex, setMessageIndex] = useState(0);
+    }, [clearStepTimers]);
 
-    // Cycle through messages while loading
-    React.useEffect(() => {
-        if (!isLoading) {
-            setMessageIndex(0);
+    const { mutate: runAnalysis, isPending } = useMutation({
+        mutationFn: async (selectedFile: File) => {
+            abortControllerRef.current?.abort();
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+            const base64Content = await readFileAsBase64(selectedFile);
+            return analyzeResume(base64Content, controller.signal);
+        },
+        onMutate: () => {
+            setIsLoading(true);
+            setError(null);
+            setActiveStep(0);
+            clearStepTimers();
+            stepTimerRef.current = STEP_TIMING_MS.slice(1).map((ms, index) => (
+                window.setTimeout(() => setActiveStep(index + 1), ms)
+            ));
+        },
+        onSuccess: result => {
+            setIsLoading(false);
+            clearStepTimers();
+            setAnalysis(result);
+            navigate('/analysis');
+        },
+        onError: (err: unknown) => {
+            setIsLoading(false);
+            clearStepTimers();
+            if (err instanceof Error && err.name === 'AbortError') return;
+
+            const msg = err instanceof Error ? err.message : 'An unknown error occurred.';
+            if (msg.includes('504') || msg.toLowerCase().includes('timeout')) {
+                setError('The analysis service timed out. Please retry in a moment.');
+            } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
+                setError('Unable to reach the backend. Check connection and try again.');
+            } else if (msg.toLowerCase().includes('file processing') || msg.includes('400')) {
+                setError('The uploaded file could not be parsed. Please use a clean PDF resume.');
+            } else {
+                setError('Something unexpected happened. Please retry.');
+            }
+        },
+    });
+
+    const handleAnalyze = useCallback(() => {
+        if (!file || isPending) return;
+        setFileName(file.name);
+        runAnalysis(file);
+    }, [file, isPending, runAnalysis, setFileName]);
+
+    const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
+        setError(null);
+
+        if (fileRejections.length > 0) {
+            const firstError = fileRejections[0].errors[0];
+            setError(firstError.code === 'file-too-large'
+                ? `File is too large. Max ${MAX_FILE_SIZE_MB}MB.`
+                : firstError.message);
+            setFile(null);
             return;
         }
 
-        const interval = setInterval(() => {
-            setMessageIndex((prev) => {
-                if (prev < LOADING_MESSAGES.length - 1) {
-                    return prev + 1;
-                }
-                return prev;
-            });
-        }, 3000);
-
-        return () => clearInterval(interval);
-    }, [isLoading]);
-
-    const handleAnalyze = async () => {
-        if (!file) return;
-
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
+        if (acceptedFiles.length > 0) {
+            setFile(acceptedFiles[0]);
         }
-        const controller = new AbortController();
-        abortControllerRef.current = controller;
-        
-        setIsLoading(true); 
-        setError(null);
-        setFileName(file.name);
-        setMessageIndex(0);
+    }, [setError, setFile]);
 
-        try {
-            const base64Content = await readFileAsBase64(file);
-            const result = await analyzeResume(base64Content, controller.signal);
-            
-            setAnalysis(result);
-            navigate('/analysis');
-
-        } catch (err) {
-            if (err instanceof Error && err.name === 'AbortError') {
-                console.log('Analysis request cancelled');
-                return;
-            }
-
-            console.error(err); // Log the actual error for developers
-            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-
-            // MODIFIED: Provide more user-friendly and actionable error messages
-            if (errorMessage.includes('504') || errorMessage.toLowerCase().includes('timeout')) {
-              setError('The server is taking longer than expected. It might be waking up. Please try again in a moment.');
-            } else if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('fetch')) {
-              setError('Could not connect to the server. Please check your internet connection and try again.');
-            } else if (errorMessage.toLowerCase().includes('file processing') || errorMessage.includes('400')) {
-                setError('There was an issue with your file. Please ensure it is a valid, non-corrupted PDF and try again.');
-            } else {
-              setError('An unexpected error occurred. Please try again.');
-            }
-        } finally {
-            setIsLoading(false); 
-        }
-    };
-
-    const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
-      setError(null);
-      if (fileRejections.length > 0) {
-          const firstRejection = fileRejections[0];
-          const firstError = firstRejection.errors[0];
-          if (firstError.code === 'file-too-large') {
-              setError(`File is too large. Please upload a file under ${MAX_FILE_SIZE_MB}MB.`);
-          } else {
-              setError(firstError.message);
-          }
-          setFile(null);
-          return;
-      }
-  
-      if (acceptedFiles.length > 0) {
-          setFile(acceptedFiles[0]);
-          setError(null);
-      }
-    }, [setFile, setError]);
-  
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
-      onDrop,
-      accept: { 'application/pdf': ['.pdf'] },
-      maxFiles: 1,
-      maxSize: MAX_FILE_SIZE_BYTES,
+        onDrop,
+        accept: { 'application/pdf': ['.pdf'] },
+        maxFiles: 1,
+        maxSize: MAX_FILE_SIZE_BYTES,
     });
+
+    const fileSummary = useMemo(
+        () => file ? `${(file.size / 1024).toFixed(0)} KB` : null,
+        [file],
+    );
 
     return (
         <AnimatedPage>
-          <FullScreenLoader isVisible={isLoading} message={LOADING_MESSAGES[messageIndex]} />
-          <div className="min-h-screen text-gray-800 dark:text-light-text flex flex-col items-center">
-            <header className="w-full max-w-6xl mx-auto flex justify-end items-center py-4 px-4 sm:px-0">
-                <ThemeToggleButton />
-            </header>
-            
-            <main className="w-full text-center flex-grow flex flex-col items-center justify-center">
-                <motion.div 
-                    className="w-full max-w-2xl flex flex-col items-center"
-                    variants={sectionVariants}
-                    initial="hidden"
-                    animate="visible"
-                >
-                    <motion.h1 variants={itemVariants} className="text-4xl md:text-6xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-pink-500">
-                      Elevate Your Career Profile
-                    </motion.h1>
-                    <motion.p variants={itemVariants} className="mt-3 text-lg md:text-xl text-gray-600 dark:text-subtle-text">
-                      Upload your resume for a dual analysis for full-time and internship roles.
-                    </motion.p>
-                    
-                    <motion.div variants={itemVariants} className="w-full max-w-lg mt-10">
-                        <div
-                            {...getRootProps()}
-                            className={`relative p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 group will-animate
-                                ${isDragActive 
-                                    ? 'border-brand-purple bg-brand-purple/10 scale-105 shadow-[0_0_25px_rgba(139,92,246,0.5)]' 
-                                    : 'border-gray-300 dark:border-neutral-700 hover:border-brand-purple hover:bg-brand-purple/5 hover:shadow-lg'}`
-                                }
-                        >
-                            <input {...getInputProps()} />
-                            <div className="flex flex-col items-center justify-center text-center transition-transform duration-300 group-hover:scale-105 will-animate">
-                                <CloudArrowUpIcon className={`h-12 w-12 text-gray-400 dark:text-subtle-text mb-4 transition-all duration-300 ${isDragActive ? 'text-brand-purple animate-bounce' : 'group-hover:text-brand-purple group-hover:scale-110'}`}/>
-                                <p className="text-xl font-semibold text-gray-700 dark:text-light-text">Upload Your Resume</p>
-                                <p className="text-gray-500 dark:text-subtle-text mt-1">Click or drag & drop (PDF only, max {MAX_FILE_SIZE_MB}MB)</p>
-                            </div>
-                        </div>
-                        {file && !isLoading && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="text-center mt-4"
-                            >
-                                <p className="text-sm text-green-600 dark:text-green-400 font-medium">✓ Selected: {file.name}</p>
-                            </motion.div>
-                        )}
-                    </motion.div>
-    
-                    <motion.div variants={itemVariants} className="mt-8">
-                        <button
-                            onClick={handleAnalyze}
-                            disabled={!file || isLoading}
-                            className="flex items-center justify-center px-10 py-3 text-lg font-semibold text-white rounded-lg transition-all transform hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed bg-gradient-to-br from-brand-purple to-pink-500 hover:brightness-110 hover:shadow-xl disabled:brightness-50 will-animate"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <ArrowPathIcon className="animate-spin h-5 w-5 mr-3" />
-                                    Analyzing...
-                                </>
-                            ) : (
-                                <>
-                                    <MagnifyingGlassIcon className="w-5 h-5 mr-2" />
-                                    Start Analysis
-                                </>
-                            )}
-                        </button>
-                    </motion.div>
-                    {error && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="mt-6 p-4 bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg max-w-lg text-left"
-                        >
-                            <h3 className="font-bold">Analysis Failed</h3>
-                            <p>{error}</p>
+            <FullScreenLoader isVisible={isPending} activeStep={activeStep} />
+
+            <div className="relative min-h-[calc(100vh-6rem)] w-full flex flex-col pt-8 pb-16">
+                <main className="grid flex-1 items-center gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 relative z-10">
+                    <motion.section
+                        variants={staggerVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="relative"
+                    >
+                        <motion.div variants={itemVariants} className="inline-flex items-center gap-2 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-accent-primary overflow-hidden relative">
+                            <span className="absolute inset-0 shimmer pointer-events-none" />
+                            <SparklesIcon className="h-3.5 w-3.5 relative z-10" />
+                            <span className="relative z-10">Career Intelligence Studio</span>
                         </motion.div>
-                    )}
-                </motion.div>
-            </main>
-          </div>
-          <footer className="w-full max-w-6xl mx-auto text-center py-4 bg-transparent">
-              <p className="text-gray-500 dark:text-subtle-text text-sm">
-                  made with ❤️ by Kaivalya
-              </p>
-          </footer>
+
+                        <motion.h1
+                            variants={itemVariants}
+                            className="mt-6 font-display text-5xl font-extrabold leading-[1.05] sm:text-6xl text-light-text text-balance"
+                        >
+                            Make your resume
+                            <span className="block mt-2 animated-gradient-text text-transparent pb-2">
+                                impossible to ignore.
+                            </span>
+                        </motion.h1>
+
+                        <motion.p
+                            variants={itemVariants}
+                            className="mt-6 max-w-lg text-lg leading-relaxed text-subtle-text"
+                        >
+                            Upload one PDF and receive a dual-track strategy for full-time and internship roles, including ATS diagnostics,
+                            skill gaps, and live opportunity matches.
+                        </motion.p>
+
+                        <motion.div variants={itemVariants} className="mt-12 grid gap-4 sm:grid-cols-3">
+                            {metrics.map(metric => (
+                                <div key={metric.label} className="glass rounded-2xl p-5 hover-lift border border-white/5 transition-all duration-300">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-accent-primary/80">{metric.label}</p>
+                                    <p className="mt-3 font-display text-3xl font-bold glow-text text-light-text">{metric.value}</p>
+                                </div>
+                            ))}
+                        </motion.div>
+                    </motion.section>
+
+                    <motion.section
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+                        className="relative rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl p-8 sm:p-10 shadow-2xl"
+                    >
+                        <div className="relative z-10">
+                            <div className="text-center mb-8">
+                                <h2 className="font-display text-2xl font-semibold tracking-tight text-light-text sm:text-3xl">Upload your resume</h2>
+                                <p className="mt-2 text-sm text-subtle-text">PDF format, max {MAX_FILE_SIZE_MB}MB.</p>
+                            </div>
+
+                            <div className="mt-8 relative">
+                                <div
+                                    {...getRootProps()}
+                                    className={`group relative cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-all duration-200 overflow-hidden
+                                        ${isDragActive
+                                            ? 'border-accent-primary bg-accent-primary/5'
+                                            : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
+                                        }`}
+                                >
+                                    <input {...getInputProps()} />
+
+                                    <motion.div
+                                        animate={isDragActive ? { y: -4, scale: 1.05 } : { y: 0, scale: 1 }}
+                                        className={'mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-white/[0.05] border border-white/10 text-light-text mb-6'}
+                                    >
+                                        <CloudArrowUpIcon className="h-6 w-6 opacity-80" />
+                                    </motion.div>
+
+                                    <p className="text-base font-medium text-light-text">
+                                        {isDragActive ? 'Drop your resume here' : 'Drag & drop your resume'}
+                                    </p>
+                                    <p className="mt-2 text-sm text-subtle-text">
+                                        or <span className="font-medium text-light-text hover:underline underline-offset-4 transition-all">browse files</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <AnimatePresence mode="wait">
+                                {file && !isPending && (
+                                    <motion.div
+                                        key="file-ready"
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        className="mt-6 flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+                                    >
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                                            ✓
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium text-light-text">{file.name}</p>
+                                            {fileSummary && <p className="text-xs text-subtle-text mt-0.5">{fileSummary}</p>}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            <motion.button
+                                onClick={handleAnalyze}
+                                disabled={!file || isPending}
+                                whileHover={file && !isPending ? { scale: 1.01 } : {}}
+                                whileTap={file && !isPending ? { scale: 0.99 } : {}}
+                                className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white text-black px-6 py-3.5 text-sm font-semibold transition-all hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                            >
+                                <MagnifyingGlassIcon className="h-4 w-4" />
+                                <span>{isPending ? 'Analyzing...' : 'Analyze Resume'}</span>
+                            </motion.button>
+
+                            <AnimatePresence>
+                                {error && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm"
+                                    >
+                                        <p className="font-medium text-red-400">{error}</p>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </motion.section>
+                </main>
+
+                <footer className="mt-8 pt-6 border-t border-white/5 text-center text-xs text-subtle-text font-medium tracking-wide z-10 relative">
+                    built by Kaivalya <span className="mx-2 opacity-50">•</span> powered by distributed AI services
+                </footer>
+            </div>
         </AnimatedPage>
-      );
+    );
 };
 
 export default Upload;

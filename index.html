@@ -6,24 +6,32 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Elevate.ai | AI Career Analysis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         darkMode: 'class',
         theme: {
           extend: {
+            fontFamily: {
+              sans: ['Manrope', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+              display: ['Sora', 'Manrope', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+            },
             colors: {
-              'snow': '#FBFBFB',
-              'brand-purple': '#8B5CF6',
-              'brand-blue': '#60A5FA',
-              'dark-bg': '#000000',
-              'dark-card': '#171717',
-              'light-text': '#E5E7EB',
-              'subtle-text': '#A1A1AA',
+              'snow': '#F8F4EA',
+              'brand-purple': '#0F766E',
+              'brand-blue': '#0891B2',
+              'brand-sun': '#F97316',
+              'dark-bg': '#081421',
+              'dark-card': '#102132',
+              'light-text': '#EDF2F7',
+              'subtle-text': '#8CA0B3',
             },
             boxShadow: {
-              'glow': '0 0 20px rgba(236, 72, 153, 0.15)',
-              'glow-lg': '0 0 30px rgba(236, 72, 153, 0.2)',
+              'glow': '0 16px 40px -24px rgba(15, 118, 110, 0.65)',
+              'glow-lg': '0 22px 55px -26px rgba(8, 145, 178, 0.55)',
             }
           },
         },
@@ -83,7 +91,6 @@
         background: rgba(156, 163, 175, 0.5);
       }
     </style>
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   </head>
   <body class="bg-snow dark:bg-dark-bg transition-colors duration-300">
     <div id="root"></div>

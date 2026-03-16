@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import type { CareerPath } from '../types';
 import ProficiencyRadarChart from './RadarChartComponent';
@@ -34,57 +33,63 @@ const DeepDiveSection = ({ path }: { path: CareerPath }) => {
             layout
         >
             <div className="space-y-8 rounded-2xl">
-                <div className="flex items-start gap-4">
-                    <LightbulbIcon className="w-8 h-8 text-violet-500 dark:text-violet-400 mt-1 shrink-0" />
+                <div className="flex items-start gap-5">
+                    <div className="rounded-xl border border-white/[0.08] p-3 bg-black/30 shadow-sm mt-1">
+                        <LightbulbIcon className="h-6 w-6 shrink-0 text-accent-secondary" />
+                    </div>
                     <div>
-                        {/* ✅ RESTORED: Added dark theme text colors */}
-                        <h3 className="text-2xl font-bold font-sans text-gray-900 dark:text-light-text">Deep Dive: <span className="text-violet-600 dark:text-violet-300">{path.role}</span></h3>
-                        <p className="text-gray-600 dark:text-subtle-text mt-1">{path.description}</p>
+                        <h3 className="font-display text-2xl font-bold text-light-text">
+                            Deep Dive: <span className="text-accent-primary">{path.role}</span>
+                        </h3>
+                        <p className="mt-2 text-[15px] font-medium text-light-text leading-relaxed">{path.description}</p>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* ✅ RESTORED: Added dark theme styles for the card */}
-                    <div className="bg-white/50 dark:bg-transparent p-6 rounded-2xl border border-brand-purple/50 dark:border-neutral-700 min-h-[150px] shadow-glow">
-                        <h4 className="flex items-center gap-3 mb-4 text-lg font-bold text-gray-800 dark:text-light-text"><ThumbsUpIcon className="w-5 h-5 text-green-500 dark:text-green-400"/>Relevant Skills</h4>
+                    <div className="bg-black/40 rounded-2xl border border-white/[0.08] min-h-[150px] p-8 transition-all duration-300 hover:border-accent-secondary/30">
+                        <h4 className="mb-5 flex items-center gap-3 font-display text-lg font-bold text-light-text">
+                            <ThumbsUpIcon className="h-5 w-5 text-emerald-400"/> Relevant Skills
+                        </h4>
                         {hasRelevantSkills ? (
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2.5">
                                 {uniqueRelevantSkills.map((skill) => (
-                                    <span key={skill.name} className="bg-green-100 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 text-green-700 dark:text-green-300 text-sm font-medium px-3 py-1.5 rounded-full">
+                                    <span key={skill.name} className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-bold tracking-wide uppercase text-emerald-300">
                                         {skill.name}
                                     </span>
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-gray-500 dark:text-subtle-text italic">No specific relevant skills were identified.</p>
+                            <p className="italic text-light-text opacity-70">No specific relevant skills were identified.</p>
                         )}
                     </div>
 
-                    {/* ✅ RESTORED: Added dark theme styles for the card */}
-                    <div className="bg-white/50 dark:bg-transparent p-6 rounded-2xl border border-brand-purple/50 dark:border-neutral-700 min-h-[150px] shadow-glow">
-                        <h4 className="flex items-center gap-3 mb-4 text-lg font-bold text-gray-800 dark:text-light-text"><SkillDevelopIcon className="w-5 h-5 text-sky-500 dark:text-sky-400"/>Skills to Develop</h4>
+                    <div className="bg-black/40 rounded-2xl border border-white/[0.08] min-h-[150px] p-8 transition-all duration-300 hover:border-accent-secondary/30">
+                        <h4 className="mb-5 flex items-center gap-3 font-display text-lg font-bold text-light-text">
+                            <SkillDevelopIcon className="h-5 w-5 text-accent-secondary"/> Skills to Develop
+                        </h4>
                         {hasSkillsToDevelop ? (
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2.5">
                                 {uniqueSkillsToDevelop.map((skill) => (
-                                    <span key={skill.name} className="bg-sky-100 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 text-sky-700 dark:text-sky-300 text-sm font-medium px-3 py-1.5 rounded-full">
+                                    <span key={skill.name} className="rounded-full border border-accent-secondary/20 bg-accent-secondary/10 px-3.5 py-1.5 text-xs font-bold tracking-wide uppercase text-accent-secondary">
                                         {skill.name}
                                     </span>
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-gray-500 dark:text-subtle-text italic">No specific skills to develop were identified.</p>
+                            <p className="italic text-light-text opacity-70">No specific skills to develop were identified.</p>
                         )}
                     </div>
                 </div>
 
                 {hasProficiencyAnalysis && (
-                    // ✅ RESTORED: Added dark theme styles for the card
-                    <div className="bg-white/50 dark:bg-transparent p-6 rounded-2xl border border-brand-purple/50 dark:border-neutral-700 shadow-glow">
-                        <div className="flex items-center gap-3 mb-3">
-                            <RadarIcon className="w-6 h-6 text-violet-500 dark:text-violet-400" />
-                            <h4 className="text-xl font-bold text-gray-800 dark:text-light-text">Skill Proficiency Gap</h4>
+                    <div className="bg-black/45 rounded-3xl border border-white/[0.08] p-8 sm:p-10 relative overflow-hidden">
+                        <div className="relative z-10 flex items-center gap-4 mb-8">
+                            <div className="rounded-xl border border-white/[0.08] p-2.5 bg-black/30 shadow-inner">
+                                <RadarIcon className="h-6 w-6 text-accent-primary" />
+                            </div>
+                            <h4 className="font-display text-2xl font-bold text-light-text">Skill Proficiency Gap</h4>
                         </div>
-                        <div className="w-full" style={{ height: '400px' }}>
+                        <div className="w-full relative z-10" style={{ height: '450px' }}>
                             <ProficiencyRadarChart skills={path.skillProficiencyAnalysis} />
                         </div>
                     </div>

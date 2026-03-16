@@ -38,6 +38,51 @@ Elevate AI is an intelligent career analysis platform that leverages Google's Ge
 - **Build Tool**: Vite
 - **Routing**: React Router DOM
 
+## 🧩 Scalable Backend Architecture
+
+The backend is now split into an API gateway plus independently scalable services:
+
+- **API Gateway** (`server/main.py`): Exposes stable public endpoints used by the frontend (`/analyze-resume-dual/`, `/fetch-jobs/`), handles routing, and reports distributed health.
+- **Analysis Service** (`server/services/analysis_service.py`): Handles PDF parsing + Gemini dual analysis.
+- **Jobs Service** (`server/services/jobs_service.py`): Handles external job search + adaptation into the frontend career-path schema.
+- **Shared Service Logic** (`server/service_logic.py`): Reusable logic so local fallback and service mode stay behavior-compatible.
+
+### Service Routing Configuration
+
+Set these environment variables on the gateway to route traffic to distributed services:
+
+- `ANALYSIS_SERVICE_URL` (example: `http://localhost:8010`)
+- `JOBS_SERVICE_URL` (example: `http://localhost:8020`)
+- `ALLOW_LOCAL_FALLBACK=true|false` (default: `true`)
+
+If service URLs are not provided, the gateway runs in local fallback mode.
+
+### Run in Distributed Mode (Local)
+
+Start each process in a separate terminal:
+
+1. Analysis service:
+```bash
+cd server
+uvicorn services.analysis_service:app --host 0.0.0.0 --port 8010 --reload
+```
+
+2. Jobs service:
+```bash
+cd server
+uvicorn services.jobs_service:app --host 0.0.0.0 --port 8020 --reload
+```
+
+3. API gateway (connected to services):
+```bash
+cd server
+ANALYSIS_SERVICE_URL=http://localhost:8010 JOBS_SERVICE_URL=http://localhost:8020 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Gateway health endpoint:
+
+- `GET /health` returns mode (`distributed` or `local-fallback`) and per-service status/latency.
+
 ## 📦 Installation
 
 1. Clone the repository:
