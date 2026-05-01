@@ -1,37 +1,40 @@
 {
-  "name": "elevate.ai---ai-career-co-pilot",
+  "name": "elevate-ai",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "clean": "rm -rf .next",
+    "predev": "npm run clean",
+    "dev": "next dev",
+    "predev:frontend": "npm run clean",
+    "dev:frontend": "next dev",
+    "dev:backend": "cd server && python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:all": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "prebuild": "npm run clean",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "@google/genai": "^0.14.0",
-    "@heroicons/react": "^2.2.0",
-    "@react-three/fiber": "^8.18.0",
-    "@tanstack/react-query": "^5.90.21",
+    "clsx": "^2.1.1",
     "framer-motion": "^11.2.12",
-    "gsap": "^3.14.2",
-    "lenis": "^1.3.18",
+    "lucide-react": "^0.460.0",
+    "next": "^14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-dropzone": "^14.2.3",
-    "react-router-dom": "^6.24.0",
     "recharts": "^2.12.7",
-    "three": "^0.183.2"
+    "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
-    "@types/react": "^19.1.8",
-    "@types/three": "^0.183.1",
-    "@vitejs/plugin-react": "^5.1.2",
-    "autoprefixer": "^10.4.27",
-    "postcss": "^8.5.8",
-    "tailwindcss": "^3.4.19",
-    "typescript": "~5.7.2",
-    "vite": "^6.2.0"
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.2.1",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.15",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.7.2"
   }
 }

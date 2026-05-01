@@ -1,0 +1,206 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========================================
+   ELEVATE.AI — Design System
+   ======================================== */
+
+:root {
+  --ev-black: #000000;
+  --ev-surface: #070707;
+  --ev-elevated: #0B0B0B;
+  --ev-card: #0E0E0E;
+  --ev-gold: #00D4FF;
+  --ev-gold-soft: #7EE8FA;
+  --ev-text: #F5F5F0;
+  --ev-text-secondary: #A8A8A0;
+  --ev-text-muted: #6F6F68;
+  --ev-border: rgba(0, 212, 255, 0.12);
+  --ev-border-strong: rgba(126, 232, 250, 0.24);
+}
+
+/* ========================================
+   Base
+   ======================================== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--ev-black);
+  color: var(--ev-text);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::selection {
+  background-color: rgba(0, 212, 255, 0.3);
+  color: var(--ev-text);
+}
+
+/* ========================================
+   Scrollbar
+   ======================================== */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================
+   Glass Card
+   ======================================== */
+
+@layer components {
+  .glass-card {
+    @apply bg-ev-card/80 backdrop-blur-sm border border-ev-border rounded-[24px];
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.04), 0 24px 80px rgba(0, 0, 0, 0.35);
+  }
+
+  .glass-card:hover {
+    border-color: rgba(0, 212, 255, 0.18);
+  }
+
+  .glass-card-elevated {
+    @apply bg-ev-elevated/90 backdrop-blur-sm border border-ev-border-strong rounded-2xl;
+  }
+
+  .dashboard-surface {
+    background: linear-gradient(180deg, rgba(10, 11, 16, 0.96), rgba(6, 7, 11, 0.92));
+    border: 1px solid rgba(0, 212, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(126, 232, 250, 0.04), 0 20px 60px rgba(0, 0, 0, 0.28);
+  }
+
+  .dashboard-surface-soft {
+    background: rgba(8, 10, 15, 0.74);
+    border: 1px solid rgba(0, 212, 255, 0.07);
+  }
+
+  .dashboard-pill {
+    background: rgba(8, 10, 15, 0.82);
+    border: 1px solid rgba(0, 212, 255, 0.09);
+  }
+
+  .dashboard-tag {
+    background: rgba(8, 10, 15, 0.82);
+    border: 1px solid rgba(126, 232, 250, 0.12);
+  }
+
+  /* Section label mono */
+  .section-label {
+    @apply text-[10px] font-mono uppercase tracking-[0.2em] text-ev-text-muted;
+  }
+
+  /* Gold accent text */
+  .text-gold-accent {
+    @apply text-ev-gold;
+  }
+
+  /* Subtle grid background */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* Score ring glow */
+  .ring-glow {
+    filter: drop-shadow(0 0 8px rgba(214, 179, 106, 0.3));
+  }
+}
+
+/* ========================================
+   Noise texture overlay
+   ======================================== */
+
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+  background-size: 200% 100%;
+}
+
+/* ========================================
+   Recharts overrides
+   ======================================== */
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.05) !important;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+/* ========================================
+   Reduced motion
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

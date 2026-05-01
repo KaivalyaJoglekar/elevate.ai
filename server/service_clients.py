@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 from fastapi import HTTPException
 
-from service_logic import run_dual_resume_analysis, run_jobs_search
+from service_logic import run_jobs_search
 
 
 ANALYSIS_SERVICE_URL = os.getenv('ANALYSIS_SERVICE_URL', '').rstrip('/')
@@ -54,6 +54,8 @@ async def route_resume_analysis(file_content: str) -> dict:
 
     if not ALLOW_LOCAL_FALLBACK and not ANALYSIS_SERVICE_URL:
         raise HTTPException(status_code=503, detail='Analysis service URL is not configured.')
+
+    from service_logic import run_dual_resume_analysis
 
     return await run_dual_resume_analysis(file_content)
 

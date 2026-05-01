@@ -38,11 +38,31 @@ def parse_pdf_text(pdf_content: bytes) -> str:
         print(f"Could not parse PDF content: {e}")
         return ""
 
-# ─── Combined prompt ──────────────────────────────────────────────────────────
+def build_dual_analysis_prompt(
+    *,
+    resume_content: str,
+    target_role: str,
+    experience_level: str,
+    job_description: str,
+    market_context: dict[str, str] | None = None,
+) -> str:
+    effective_job_description = job_description.strip() or "No explicit job description was provided. Infer fit from the target role and the resume."
+    market_context = market_context or {}
+    market_region_name = market_context.get("region_name", "India")
+    market_country_code = market_context.get("country_code", "in").upper()
+    market_timezone = market_context.get("timezone", "Asia/Kolkata")
+    market_currency = market_context.get("currency", "INR")
 
-DUAL_ANALYSIS_PROMPT_TEMPLATE = """
-You are an expert AI career coach. Analyse the resume below for TWO scenarios simultaneously.
-Return a SINGLE, valid JSON object. Do NOT include markdown, code fences, or explanatory text — only the raw JSON.
+    return f"""
+You are an expert AI career coach and ATS reviewer. Analyse the resume below for TWO scenarios simultaneously.
+Return a SINGLE, valid JSON object. Do NOT include markdown, code fences, or explanatory text.
+
+Target role: {target_role}
+Candidate level: {experience_level}
+Primary hiring market: {market_region_name} ({market_country_code})
+Market context: timezone {market_timezone}, currency {market_currency}
+Job description:
+{effective_job_description[:6000]}
 
 The JSON structure must be exactly:
 {{
@@ -69,14 +89,20 @@ The JSON structure must be exactly:
 }}
 
 Instructions:
-- full_time_analysis: Tailor all advice for someone pursuing a permanent, full-time position. Emphasise measurable impact, leadership potential, and career trajectory.
-- internship_analysis: Tailor all advice for a student seeking an internship. If professional experience is sparse, lean heavily on academic projects, open-source contributions, and transferable skills. Keep ATS score expectations realistic for entry-level candidates.
-- extractedSkills should be a comprehensive list of both technical and soft skills found in the resume.
-- For ATS scores: base the score on keyword density, formatting clarity, and role-fit.
-- Provide at least 4 concrete improvements and upskilling suggestions per section.
+- Score ATS fit using role alignment, keyword coverage, clarity of resume structure, and evidence of impact.
+- full_time_analysis: optimise for full-time hiring, ownership, measurable outcomes, and production readiness.
+- internship_analysis: optimise for internships, growth potential, academic projects, and entry-level positioning.
+- Keep all advice grounded in the {market_region_name} hiring market unless the resume or job description clearly specifies another geography.
+- Prefer recruiter-ready language that works for Indian software, product, and startup hiring workflows.
+- Do not introduce visa, GPA-scale, compensation, or relocation assumptions unless they are explicitly present in the input.
+- extractedSkills must include both technical and soft skills explicitly supported by the resume.
+- experienceSummary should be concrete and concise. Do not invent employers, dates, or metrics.
+- educationSummary should copy the resume faithfully and preserve institution/degree details when present.
+- generalResumeImprovements should be specific, actionable, and focused on resume quality.
+- generalUpskillingSuggestions should be specific and role-relevant.
 
 Resume Content:
 ---
-{resume_content}
+{resume_content[:14000]}
 ---
-"""
+""".strip()

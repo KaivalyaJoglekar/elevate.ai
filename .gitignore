@@ -1,4 +1,16 @@
-# Logs
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# build outputs
+.next/
+out/
+build/
+dist/
+dist-ssr/
+
+# logs
 logs
 *.log
 npm-debug.log*
@@ -7,12 +19,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# local env files
+.env
+.env.local
+.env.production
+.env*.local
+server/.env
+server/.env.local
+server/.env.production
 
-# Editor directories and files
+# editor and OS files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -23,14 +39,15 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment files (contain sensitive data)
-.env
-.env.local
-.env.production
-server/.env
-server/.env.local
-server/.env.production
+# next.js
+next-env.d.ts
+*.tsbuildinfo
 
-# Python
+# python
 __pycache__/
 *.pyc
+
+# backend local environments
+server/node_modules/
+server/venv/
+server/.venv/
