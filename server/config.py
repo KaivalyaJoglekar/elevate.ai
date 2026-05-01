@@ -27,7 +27,7 @@ class Settings:
     upstash_redis_host = os.getenv('UPSTASH_REDIS_HOST', '').strip()
     upstash_redis_port = os.getenv('UPSTASH_REDIS_PORT', '').strip()
     upstash_redis_password = os.getenv('UPSTASH_REDIS_PASSWORD', '').strip()
-    public_backend_url = os.getenv('PUBLIC_BACKEND_URL', 'http://localhost:8000').rstrip('/')
+    public_backend_url = os.getenv('PUBLIC_BACKEND_URL', 'https://elevate-ai-p0pn.onrender.com').rstrip('/')
 
     result_ttl_seconds = int(os.getenv('RESULT_TTL_SECONDS', str(7 * 24 * 60 * 60)))
     cache_ttl_seconds = int(os.getenv('CACHE_TTL_SECONDS', str(7 * 24 * 60 * 60)))
