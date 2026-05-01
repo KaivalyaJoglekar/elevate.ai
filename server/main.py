@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
+from fastapi.responses import Response
 
 from config import get_settings
 from models import AnalysisStatusPayload, JobSearchRequest, ResumeRequest, RetargetRequest
@@ -64,6 +65,16 @@ def _market_context() -> dict[str, str]:
         'region_name': settings.market_region_name,
         'timezone': settings.market_timezone,
         'currency': settings.market_currency,
+    }
+
+
+def _basic_health_payload() -> dict[str, str]:
+    return {
+        'status': 'ok',
+        'app_name': settings.app_name,
+        'version': settings.app_version,
+        'timestamp_utc': datetime.now(timezone.utc).isoformat(),
+        'market_context': _market_context(),
     }
 
 
@@ -297,9 +308,18 @@ async def fetch_jobs_endpoint(request: JobSearchRequest):
         raise HTTPException(status_code=500, detail=f'Gateway error during job fetch: {exc}') from exc
 
 
-@app.get('/health')
-@app.get('/api/health')
-async def health_endpoint():
+@app.api_route('/health', methods=['GET', 'HEAD'])
+async def render_health_endpoint(request: Request):
+    if request.method == 'HEAD':
+        return Response(status_code=200)
+    return _basic_health_payload()
+
+
+@app.api_route('/api/health', methods=['GET', 'HEAD'])
+async def health_endpoint(request: Request):
+    if request.method == 'HEAD':
+        return Response(status_code=200)
+
     health = await get_gateway_health()
     try:
         redis_client = get_sync_redis()
@@ -308,15 +328,15 @@ async def health_endpoint():
         health['redis'] = f'unreachable: {exc}'
     health['queue'] = 'direct'
     health['broker'] = 'memory-local' if using_local_memory_store() else 'upstash-redis'
-    health['app_name'] = settings.app_name
-    health['version'] = settings.app_version
-    health['timestamp_utc'] = datetime.now(timezone.utc).isoformat()
-    health['market_context'] = _market_context()
+    health.update(_basic_health_payload())
     return health
 
 
-@app.get('/')
-def read_root():
+@app.api_route('/', methods=['GET', 'HEAD'])
+def read_root(request: Request):
+    if request.method == 'HEAD':
+        return Response(status_code=200)
+
     return {
         'status': 'ok',
         'message': 'Elevate.ai resume analysis API is running',

@@ -273,6 +273,28 @@ class ApiEndpointTests(unittest.TestCase):
         self.assertEqual(payload["queue"], "direct")
         response.close()
 
+    def test_render_health_endpoint_is_lightweight(self) -> None:
+        with patch("main.get_gateway_health", new=AsyncMock(side_effect=AssertionError("should not be called"))):
+            response = self.client.get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["market_context"]["region_name"], "India")
+        response.close()
+
+    def test_root_and_health_support_head_requests(self) -> None:
+        root_response = self.client.head("/")
+        health_response = self.client.head("/health")
+        api_health_response = self.client.head("/api/health")
+
+        self.assertEqual(root_response.status_code, 200)
+        self.assertEqual(health_response.status_code, 200)
+        self.assertEqual(api_health_response.status_code, 200)
+        root_response.close()
+        health_response.close()
+        api_health_response.close()
+
 
 if __name__ == "__main__":
     unittest.main()
