@@ -28,7 +28,18 @@ jobs:
         run: ruff check server --select E9,F63,F7,F82
 
       - name: Compile backend modules
-        run: python -m py_compile server/*.py server/services/*.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import py_compile
+
+          excluded_dirs = {".venv", "venv", "__pycache__"}
+
+          for path in Path("server").rglob("*.py"):
+              if any(part in excluded_dirs for part in path.parts):
+                  continue
+              py_compile.compile(str(path), doraise=True)
+          PY
 
       - name: Setup Node
         uses: actions/setup-node@v4
