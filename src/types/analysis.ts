@@ -63,6 +63,7 @@ export interface AnalysisResult {
   full_time_query: string;
   internship_query: string;
   job_market_status: string;
+  job_market_pending?: boolean;
   job_market_live?: boolean;
   full_time_job_count?: number;
   internship_job_count?: number;

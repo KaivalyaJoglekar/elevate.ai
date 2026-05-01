@@ -277,7 +277,7 @@ async def _safe_job_search(query: str, job_type: str, *, fallback_queries: list[
         return [], str(exc)
 
 
-async def run_resume_review(
+async def build_resume_review_core(
     *,
     resume_text: str,
     target_role: str,
@@ -336,18 +336,65 @@ async def run_resume_review(
         job_description,
         market_region=settings.market_region_name,
     )
+    total_elapsed_ms = round((time.perf_counter() - analysis_started_at) * 1000, 2)
+    return {
+        'candidate_name': full_time_analysis['name'],
+        'target_role': target_role,
+        'experience_level': experience_level,
+        'parsing_method': parsing_method,
+        'resume_text_raw': resume_text,
+        'job_description_raw': job_description,
+        'resume_excerpt': resume_text[:1200],
+        'job_description_excerpt': job_description[:500],
+        'full_time_query': full_time_query,
+        'internship_query': internship_query,
+        'job_market_status': f'Core analysis ready. Loading live {settings.market_region_name} market data.',
+        'job_market_live': False,
+        'job_market_pending': True,
+        'market_context': market_context,
+        'analysis_metadata': {
+            'backend_version': settings.app_version,
+            'generated_at_utc': generated_at_utc,
+            'timings_ms': {
+                'llm_analysis': llm_elapsed_ms,
+                'market_enrichment': 0,
+                'total': total_elapsed_ms,
+            },
+        },
+        'quality_signals': {
+            'resume_word_count': count_meaningful_words(resume_text),
+            'job_description_present': bool(job_description.strip()),
+            'job_feed_mode': 'pending',
+            'market_region': settings.market_region_name,
+        },
+        'full_time_job_count': 0,
+        'internship_job_count': 0,
+        'full_time_analysis': full_time_analysis,
+        'internship_analysis': internship_analysis,
+    }
+
+
+async def enrich_resume_review_market(result: dict[str, Any]) -> dict[str, Any]:
+    settings = get_settings()
+    target_role = str(result.get('target_role', 'Software Engineer'))
+    market_region = str(result.get('market_context', {}).get('region_name', settings.market_region_name))
+    full_time_query = str(result.get('full_time_query', '')).strip() or target_role
+    internship_query = str(result.get('internship_query', '')).strip() or f'{target_role} internship'
+
+    full_time_analysis = dict(result.get('full_time_analysis', {}) or {})
+    internship_analysis = dict(result.get('internship_analysis', {}) or {})
 
     async def run_market_enrichment() -> tuple[tuple[list, str | None], tuple[list, str | None]]:
         return await asyncio.gather(
             _safe_job_search(
                 full_time_query,
                 'full-time',
-                fallback_queries=_build_role_search_fallbacks(target_role, settings.market_region_name, 'full-time'),
+                fallback_queries=_build_role_search_fallbacks(target_role, market_region, 'full-time'),
             ),
             _safe_job_search(
                 internship_query,
                 'internship',
-                fallback_queries=_build_role_search_fallbacks(target_role, settings.market_region_name, 'internship'),
+                fallback_queries=_build_role_search_fallbacks(target_role, market_region, 'internship'),
             ),
         )
 
@@ -372,40 +419,43 @@ async def run_resume_review(
     if internship_error:
         market_notes.append(f'Internship feed unavailable: {internship_error}')
     if not market_notes:
-        market_notes.append(f'Live {settings.market_region_name} job market feed updated successfully.')
+        market_notes.append(f'Live {market_region} job market feed updated successfully.')
 
-    total_elapsed_ms = round((time.perf_counter() - analysis_started_at) * 1000, 2)
-    return {
-        'candidate_name': full_time_analysis['name'],
-        'target_role': target_role,
-        'experience_level': experience_level,
-        'parsing_method': parsing_method,
-        'resume_text_raw': resume_text,
-        'job_description_raw': job_description,
-        'resume_excerpt': resume_text[:1200],
-        'job_description_excerpt': job_description[:500],
-        'full_time_query': full_time_query,
-        'internship_query': internship_query,
-        'job_market_status': ' '.join(market_notes),
-        'job_market_live': not full_time_error and not internship_error,
-        'market_context': market_context,
-        'analysis_metadata': {
-            'backend_version': settings.app_version,
-            'generated_at_utc': generated_at_utc,
-            'timings_ms': {
-                'llm_analysis': llm_elapsed_ms,
-                'market_enrichment': market_elapsed_ms,
-                'total': total_elapsed_ms,
-            },
-        },
-        'quality_signals': {
-            'resume_word_count': count_meaningful_words(resume_text),
-            'job_description_present': bool(job_description.strip()),
-            'job_feed_mode': 'live' if not full_time_error and not internship_error else 'partial',
-            'market_region': settings.market_region_name,
-        },
-        'full_time_job_count': len(full_time_jobs),
-        'internship_job_count': len(internship_jobs),
-        'full_time_analysis': full_time_analysis,
-        'internship_analysis': internship_analysis,
-    }
+    updated_result = dict(result)
+    updated_result['full_time_analysis'] = full_time_analysis
+    updated_result['internship_analysis'] = internship_analysis
+    updated_result['job_market_status'] = ' '.join(market_notes)
+    updated_result['job_market_live'] = not full_time_error and not internship_error
+    updated_result['job_market_pending'] = False
+    updated_result['full_time_job_count'] = len(full_time_jobs)
+    updated_result['internship_job_count'] = len(internship_jobs)
+
+    quality_signals = dict(updated_result.get('quality_signals', {}) or {})
+    quality_signals['job_feed_mode'] = 'live' if not full_time_error and not internship_error else 'partial'
+    updated_result['quality_signals'] = quality_signals
+
+    analysis_metadata = dict(updated_result.get('analysis_metadata', {}) or {})
+    timings = dict(analysis_metadata.get('timings_ms', {}) or {})
+    timings['market_enrichment'] = market_elapsed_ms
+    timings['total'] = round(float(timings.get('total', 0) or 0) + market_elapsed_ms, 2)
+    analysis_metadata['timings_ms'] = timings
+    updated_result['analysis_metadata'] = analysis_metadata
+    return updated_result
+
+
+async def run_resume_review(
+    *,
+    resume_text: str,
+    target_role: str,
+    experience_level: str,
+    job_description: str,
+    parsing_method: str,
+) -> dict[str, Any]:
+    core_result = await build_resume_review_core(
+        resume_text=resume_text,
+        target_role=target_role,
+        experience_level=experience_level,
+        job_description=job_description,
+        parsing_method=parsing_method,
+    )
+    return await enrich_resume_review_market(core_result)

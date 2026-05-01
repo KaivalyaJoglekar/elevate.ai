@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -20,6 +21,7 @@ def _analysis_result(target_role: str) -> dict:
         "full_time_query": f"{target_role} India",
         "internship_query": f"{target_role} internship India",
         "job_market_status": "Live job feed available",
+        "job_market_pending": False,
         "job_market_live": True,
         "full_time_job_count": 7,
         "internship_job_count": 5,
@@ -104,6 +106,20 @@ def _analysis_result(target_role: str) -> dict:
     }
 
 
+def _pending_analysis_result(target_role: str) -> dict:
+    payload = copy.deepcopy(_analysis_result(target_role))
+    payload["job_market_status"] = "Core analysis ready. Loading live India market data."
+    payload["job_market_pending"] = True
+    payload["job_market_live"] = False
+    payload["full_time_job_count"] = 0
+    payload["internship_job_count"] = 0
+    payload["quality_signals"]["job_feed_mode"] = "pending"
+    payload["analysis_metadata"]["timings_ms"]["market_enrichment"] = 0
+    payload["full_time_analysis"]["careerPaths"] = []
+    payload["internship_analysis"]["careerPaths"] = []
+    return payload
+
+
 def _task_payload(
     task_id: str,
     *,
@@ -149,7 +165,8 @@ class ApiEndpointTests(unittest.TestCase):
         def capture_task(coroutine) -> None:
             scheduled_tasks.append(coroutine)
 
-        analysis_mock = AsyncMock(return_value=_analysis_result("Backend Engineer"))
+        core_analysis_mock = AsyncMock(return_value=_pending_analysis_result("Backend Engineer"))
+        enrich_analysis_mock = AsyncMock(return_value=_analysis_result("Backend Engineer"))
 
         with (
             patch("main.enforce_daily_rate_limit", return_value=(True, 5)),
@@ -159,7 +176,8 @@ class ApiEndpointTests(unittest.TestCase):
             patch("main.validate_resume_text_quality", return_value=120),
             patch("main.persist_cached_result"),
             patch("main.update_task", side_effect=fake_update_task),
-            patch("main.run_resume_review", new=analysis_mock),
+            patch("main.build_resume_review_core", new=core_analysis_mock),
+            patch("main.enrich_resume_review_market", new=enrich_analysis_mock),
             patch("main._schedule_background_task", side_effect=capture_task),
         ):
             response = self.client.post(
@@ -173,15 +191,20 @@ class ApiEndpointTests(unittest.TestCase):
             )
             self.assertEqual(len(scheduled_tasks), 1)
             asyncio.run(scheduled_tasks[0])
+            self.assertEqual(len(scheduled_tasks), 2)
+            self.assertTrue(update_calls[-1]["result"]["job_market_pending"])
+            asyncio.run(scheduled_tasks[1])
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["status"], "queued")
         self.assertIsNone(payload["result"])
-        self.assertEqual(analysis_mock.await_args.kwargs["target_role"], "Backend Engineer")
-        self.assertEqual(analysis_mock.await_args.kwargs["experience_level"], "Entry Level")
+        self.assertEqual(core_analysis_mock.await_args.kwargs["target_role"], "Backend Engineer")
+        self.assertEqual(core_analysis_mock.await_args.kwargs["experience_level"], "Entry Level")
+        self.assertEqual(enrich_analysis_mock.await_args.args[0]["target_role"], "Backend Engineer")
         self.assertEqual(update_calls[-1]["current_step"], "Dashboard ready")
         self.assertEqual(update_calls[-1]["result"]["target_role"], "Backend Engineer")
+        self.assertFalse(update_calls[-1]["result"]["job_market_pending"])
         response.close()
 
     def test_retarget_endpoint_reuses_existing_resume_text(self) -> None:
@@ -195,7 +218,8 @@ class ApiEndpointTests(unittest.TestCase):
         def capture_task(coroutine) -> None:
             scheduled_tasks.append(coroutine)
 
-        analysis_mock = AsyncMock(return_value=_analysis_result("Data Analyst"))
+        core_analysis_mock = AsyncMock(return_value=_pending_analysis_result("Data Analyst"))
+        enrich_analysis_mock = AsyncMock(return_value=_analysis_result("Data Analyst"))
         existing_payload = {
             "result": {
                 "resume_text_raw": "Original parsed resume text",
@@ -209,7 +233,8 @@ class ApiEndpointTests(unittest.TestCase):
             patch("main.get_task_status", new=AsyncMock(return_value=existing_payload)),
             patch("main.initialize_task_state"),
             patch("main.update_task", side_effect=fake_update_task),
-            patch("main.run_resume_review", new=analysis_mock),
+            patch("main.build_resume_review_core", new=core_analysis_mock),
+            patch("main.enrich_resume_review_market", new=enrich_analysis_mock),
             patch("main._schedule_background_task", side_effect=capture_task),
         ):
             response = self.client.post(
@@ -222,16 +247,21 @@ class ApiEndpointTests(unittest.TestCase):
             )
             self.assertEqual(len(scheduled_tasks), 1)
             asyncio.run(scheduled_tasks[0])
+            self.assertEqual(len(scheduled_tasks), 2)
+            self.assertTrue(update_calls[-1]["result"]["job_market_pending"])
+            asyncio.run(scheduled_tasks[1])
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertNotEqual(payload["task_id"], "original-task")
         self.assertEqual(payload["status"], "queued")
         self.assertIsNone(payload["result"])
-        self.assertEqual(analysis_mock.await_args.kwargs["resume_text"], "Original parsed resume text")
-        self.assertEqual(analysis_mock.await_args.kwargs["target_role"], "Data Analyst")
+        self.assertEqual(core_analysis_mock.await_args.kwargs["resume_text"], "Original parsed resume text")
+        self.assertEqual(core_analysis_mock.await_args.kwargs["target_role"], "Data Analyst")
+        self.assertEqual(enrich_analysis_mock.await_args.args[0]["target_role"], "Data Analyst")
         self.assertEqual(update_calls[-1]["current_step"], "Dashboard ready")
         self.assertEqual(update_calls[-1]["result"]["target_role"], "Data Analyst")
+        self.assertFalse(update_calls[-1]["result"]["job_market_pending"])
         response.close()
 
     def test_job_search_aliases_delegate_to_backend_search(self) -> None:

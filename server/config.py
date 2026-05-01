@@ -40,6 +40,7 @@ class Settings:
     max_upload_size_bytes = int(os.getenv('MAX_UPLOAD_SIZE_BYTES', str(5 * 1024 * 1024)))
     minimum_resume_words = int(os.getenv('MINIMUM_RESUME_WORDS', '60'))
     sentence_model_name = os.getenv('SENTENCE_MODEL_NAME', 'sentence-transformers/all-MiniLM-L6-v2')
+    auto_market_enrichment_enabled = os.getenv('AUTO_MARKET_ENRICHMENT_ENABLED', 'true').lower() in {'1', 'true', 'yes'}
     job_search_timeout_seconds = float(os.getenv('JOB_SEARCH_TIMEOUT_SECONDS', '8'))
     job_search_max_candidates = int(os.getenv('JOB_SEARCH_MAX_CANDIDATES', '3'))
     market_enrichment_timeout_seconds = float(os.getenv('MARKET_ENRICHMENT_TIMEOUT_SECONDS', '12'))

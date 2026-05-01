@@ -15,6 +15,7 @@ import ProfileEvidence from "@/components/dashboard/ProfileEvidence";
 import CareerAnalytics from "@/components/dashboard/CareerAnalytics";
 import RecommendedOpportunities from "@/components/dashboard/RecommendedOpportunities";
 import ErrorState from "@/components/ui/ErrorState";
+import GlassCard from "@/components/ui/GlassCard";
 import ProcessingOverlay from "@/components/upload/ProcessingOverlay";
 import { useResumeContext } from "@/hooks/useResumeContext";
 import { fetchAnalysisStatus, retargetExistingAnalysis } from "@/lib/api";
@@ -94,7 +95,11 @@ export default function DashboardTaskPage() {
       return;
     }
 
-    if (!["queued", "processing"].includes(analysisStatus.status)) {
+    const shouldContinuePolling =
+      ["queued", "processing"].includes(analysisStatus.status) ||
+      (analysisStatus.status === "completed" && Boolean(analysisStatus.result?.job_market_pending));
+
+    if (!shouldContinuePolling) {
       return;
     }
 
@@ -106,7 +111,7 @@ export default function DashboardTaskPage() {
       } catch (pollError) {
         setError(pollError instanceof Error ? pollError.message : "Failed to refresh analysis.");
       }
-    }, 1500);
+    }, analysisStatus.status === "completed" ? 2500 : 1500);
 
     return () => window.clearInterval(intervalId);
   }, [analysisStatus, isRetargeting, setAnalysisStatus, setError, taskId]);
@@ -135,6 +140,7 @@ export default function DashboardTaskPage() {
   const hasValidPaths = (activeAnalysis?.careerPaths || []).some(
     (path) => path && path.role && path.matchPercentage
   );
+  const isMarketPending = Boolean(activeResult?.job_market_pending);
   const activeMarketQuery = selectedTrack === "full_time_analysis"
     ? activeResult?.full_time_query
     : activeResult?.internship_query;
@@ -235,6 +241,7 @@ export default function DashboardTaskPage() {
                 experienceLevel={activeResult?.experience_level}
                 marketRegion={activeResult?.market_context?.region_name}
                 marketStatus={activeResult?.job_market_status}
+                marketPending={activeResult?.job_market_pending}
                 marketLive={activeResult?.job_market_live}
                 fullTimeJobCount={activeResult?.full_time_job_count}
                 internshipJobCount={activeResult?.internship_job_count}
@@ -320,27 +327,30 @@ export default function DashboardTaskPage() {
               </div>
             </section>
 
-            {hasValidPaths ? (
-              <>
-                <CareerAnalytics careerPaths={activeAnalysis.careerPaths} />
-                <RecommendedOpportunities
-                  careerPaths={activeAnalysis.careerPaths}
-                  marketQuery={activeMarketQuery}
-                  jobType={selectedTrack === "full_time_analysis" ? "full-time" : "internship"}
-                  marketRegion={activeResult?.market_context?.region_name}
-                  targetRole={activeResult?.target_role}
-                />
-              </>
-            ) : (
-              <ErrorState
-                title="Analysis Incomplete"
-                message={
-                  activeResult?.job_market_status ||
-                  "The backend returned a partial report without career path matches for this track."
-                }
-                onRetry={handleNewAnalysis}
-              />
+            {hasValidPaths && (
+              <CareerAnalytics careerPaths={activeAnalysis.careerPaths} />
             )}
+
+            {!hasValidPaths && (
+              <GlassCard
+                padding="md"
+                className="dashboard-surface rounded-[24px]"
+              >
+                <p className="text-sm text-ev-text-secondary">
+                  {isMarketPending
+                    ? activeResult?.job_market_status || "Loading live market opportunities in the background."
+                    : activeResult?.job_market_status || "No live role matches are available for this track yet. You can still search manually below."}
+                </p>
+              </GlassCard>
+            )}
+
+            <RecommendedOpportunities
+              careerPaths={activeAnalysis.careerPaths}
+              marketQuery={activeMarketQuery}
+              jobType={selectedTrack === "full_time_analysis" ? "full-time" : "internship"}
+              marketRegion={activeResult?.market_context?.region_name}
+              targetRole={activeResult?.target_role}
+            />
           </motion.div>
         )}
 

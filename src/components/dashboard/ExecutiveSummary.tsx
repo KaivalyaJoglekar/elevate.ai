@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertTriangle, CheckCircle2, Gauge, User } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Gauge, Loader2, User } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import ExpandableText from "@/components/ui/ExpandableText";
 
@@ -12,6 +12,7 @@ interface ExecutiveSummaryProps {
   experienceLevel?: string;
   marketRegion?: string;
   marketStatus?: string;
+  marketPending?: boolean;
   marketLive?: boolean;
   fullTimeJobCount?: number;
   internshipJobCount?: number;
@@ -24,6 +25,7 @@ export default function ExecutiveSummary({
   experienceLevel,
   marketRegion,
   marketStatus,
+  marketPending = false,
   marketLive = true,
   fullTimeJobCount = 0,
   internshipJobCount = 0,
@@ -94,13 +96,17 @@ export default function ExecutiveSummary({
             <div className="grid gap-3">
               <div
                 className={`rounded-2xl border px-4 py-4 ${
-                  marketLive
+                  marketPending
+                    ? "bg-cyan-500/10 border-cyan-500/20"
+                    : marketLive
                     ? "bg-emerald-500/10 border-emerald-500/20"
                     : "bg-amber-500/10 border-amber-500/20"
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  {marketLive ? (
+                  {marketPending ? (
+                    <Loader2 className="w-3.5 h-3.5 mt-0.5 animate-spin text-cyan-300" />
+                  ) : marketLive ? (
                     <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-emerald-400" />
                   ) : (
                     <AlertTriangle className="w-3.5 h-3.5 mt-0.5 text-amber-400" />
@@ -108,10 +114,18 @@ export default function ExecutiveSummary({
                   <div className="space-y-1">
                     <p
                       className={`text-xs font-medium uppercase tracking-[0.14em] ${
-                        marketLive ? "text-emerald-300" : "text-amber-300"
+                        marketPending
+                          ? "text-cyan-300"
+                          : marketLive
+                            ? "text-emerald-300"
+                            : "text-amber-300"
                       }`}
                     >
-                      {marketLive ? "Market feed connected" : "Market feed incomplete"}
+                      {marketPending
+                        ? "Market feed loading"
+                        : marketLive
+                          ? "Market feed connected"
+                          : "Market feed incomplete"}
                     </p>
                     <p className="text-[11px] text-ev-text-secondary leading-relaxed">
                       {marketStatus || "Live job market feed updated successfully."}
@@ -134,8 +148,12 @@ export default function ExecutiveSummary({
                 </div>
                 <div className="dashboard-surface-soft rounded-2xl px-4 py-4">
                   <p className="section-label mb-2">Feed Health</p>
-                  <p className={`font-display text-2xl font-bold ${marketLive ? "text-emerald-300" : "text-amber-300"}`}>
-                    {marketLive ? "OK" : "WARN"}
+                  <p
+                    className={`font-display text-2xl font-bold ${
+                      marketPending ? "text-cyan-300" : marketLive ? "text-emerald-300" : "text-amber-300"
+                    }`}
+                  >
+                    {marketPending ? "SYNC" : marketLive ? "OK" : "WARN"}
                   </p>
                   <p className="mt-1 text-xs text-ev-text-muted">job-market enrichment state</p>
                 </div>

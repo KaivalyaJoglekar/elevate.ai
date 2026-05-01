@@ -29,7 +29,7 @@ from resume_pipeline import (
     validate_resume_text_quality,
 )
 from service_clients import get_gateway_health, route_job_search
-from service_logic import run_resume_review
+from service_logic import build_resume_review_core, enrich_resume_review_market, run_resume_review
 
 
 settings = get_settings()
@@ -95,6 +95,17 @@ def _schedule_background_task(coroutine: Coroutine[object, object, None]) -> Non
     task.add_done_callback(_background_tasks.discard)
 
 
+def _skip_market_enrichment(result: dict[str, object]) -> dict[str, object]:
+    skipped_result = dict(result)
+    skipped_result['job_market_pending'] = False
+    skipped_result['job_market_live'] = False
+    skipped_result['job_market_status'] = 'Auto-loading of live market roles is disabled. Use JSearch Explorer to fetch roles on demand.'
+    quality_signals = dict(skipped_result.get('quality_signals', {}) or {})
+    quality_signals['job_feed_mode'] = 'manual'
+    skipped_result['quality_signals'] = quality_signals
+    return skipped_result
+
+
 async def _run_analysis_task(
     *,
     task_id: str,
@@ -115,21 +126,33 @@ async def _run_analysis_task(
         await asyncio.to_thread(validate_resume_text_quality, resume_text)
 
         update_task(task_id, status='processing', progress=52, current_step='Running Gemini analysis')
-        result = await run_resume_review(
+        result = await build_resume_review_core(
             resume_text=resume_text,
             target_role=target_role,
             experience_level=experience_level,
             job_description=job_description,
             parsing_method=parsing_method,
         )
-        persist_cached_result(cache_hash, result)
+        should_auto_enrich_market = settings.auto_market_enrichment_enabled
+        result_to_store = result if should_auto_enrich_market else _skip_market_enrichment(result)
+        if not should_auto_enrich_market:
+            persist_cached_result(cache_hash, result_to_store)
+
         update_task(
             task_id,
             status='completed',
             progress=100,
             current_step='Dashboard ready',
-            result=result,
+            result=result_to_store,
         )
+        if should_auto_enrich_market:
+            _schedule_background_task(
+                _run_market_enrichment_task(
+                    task_id=task_id,
+                    result=result,
+                    cache_hash=cache_hash,
+                )
+            )
     except Exception as exc:
         update_task(task_id, status='failed', progress=100, current_step='Analysis failed', error=str(exc))
 
@@ -145,22 +168,62 @@ async def _run_retarget_task(
 ) -> None:
     try:
         update_task(task_id, status='processing', progress=24, current_step='Reframing target role')
-        result = await run_resume_review(
+        result = await build_resume_review_core(
             resume_text=resume_text,
             target_role=target_role,
             experience_level=experience_level,
             job_description=job_description,
             parsing_method=parsing_method,
         )
+        should_auto_enrich_market = settings.auto_market_enrichment_enabled
+        result_to_store = result if should_auto_enrich_market else _skip_market_enrichment(result)
+
         update_task(
             task_id,
             status='completed',
             progress=100,
             current_step='Dashboard ready',
-            result=result,
+            result=result_to_store,
         )
+        if should_auto_enrich_market:
+            _schedule_background_task(
+                _run_market_enrichment_task(
+                    task_id=task_id,
+                    result=result,
+                )
+            )
     except Exception as exc:
         update_task(task_id, status='failed', progress=100, current_step='Analysis failed', error=str(exc))
+
+
+async def _run_market_enrichment_task(
+    *,
+    task_id: str,
+    result: dict[str, object],
+    cache_hash: str | None = None,
+) -> None:
+    try:
+        enriched_result = await enrich_resume_review_market(result)
+    except Exception as exc:
+        enriched_result = dict(result)
+        enriched_result['job_market_pending'] = False
+        enriched_result['job_market_live'] = False
+        enriched_result['job_market_status'] = f'Live market feed unavailable: {exc}'
+        quality_signals = dict(enriched_result.get('quality_signals', {}) or {})
+        quality_signals['job_feed_mode'] = 'partial'
+        enriched_result['quality_signals'] = quality_signals
+
+    if cache_hash:
+        persist_cached_result(cache_hash, enriched_result)
+
+    update_task(
+        task_id,
+        status='completed',
+        progress=100,
+        current_step='Dashboard ready',
+        result=enriched_result,
+        error=None,
+    )
 
 
 @app.exception_handler(RequestValidationError)
