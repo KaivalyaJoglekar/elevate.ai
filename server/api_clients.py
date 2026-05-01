@@ -43,7 +43,12 @@ async def _fetch_from_jsearch(query: str, employment_types: str):
                 f"'{search_query}' in region: '{settings.market_region_name}' "
                 f"({settings.market_country_code.upper()})"
             )
-            response = await client.get(JSEARCH_API_URL, headers=headers, params=params, timeout=20.0)
+            response = await client.get(
+                JSEARCH_API_URL,
+                headers=headers,
+                params=params,
+                timeout=settings.job_search_timeout_seconds,
+            )
             response.raise_for_status()
         data = response.json()
         job_data = data.get("data", [])

@@ -66,11 +66,12 @@ async def run_dual_resume_analysis(file_content: str) -> dict:
 
 
 async def run_jobs_search(query: str, job_type: str, *, fallback_queries: list[str] | None = None) -> list:
+    settings = get_settings()
     search_candidates = _unique_terms([
         query,
         *(fallback_queries or []),
         *_build_generic_search_fallbacks(query, job_type),
-    ])
+    ])[: max(1, settings.job_search_max_candidates)]
 
     for candidate in search_candidates:
         if job_type == 'full-time':
@@ -336,19 +337,30 @@ async def run_resume_review(
         market_region=settings.market_region_name,
     )
 
+    async def run_market_enrichment() -> tuple[tuple[list, str | None], tuple[list, str | None]]:
+        return await asyncio.gather(
+            _safe_job_search(
+                full_time_query,
+                'full-time',
+                fallback_queries=_build_role_search_fallbacks(target_role, settings.market_region_name, 'full-time'),
+            ),
+            _safe_job_search(
+                internship_query,
+                'internship',
+                fallback_queries=_build_role_search_fallbacks(target_role, settings.market_region_name, 'internship'),
+            ),
+        )
+
     market_started_at = time.perf_counter()
-    (full_time_jobs, full_time_error), (internship_jobs, internship_error) = await asyncio.gather(
-        _safe_job_search(
-            full_time_query,
-            'full-time',
-            fallback_queries=_build_role_search_fallbacks(target_role, settings.market_region_name, 'full-time'),
-        ),
-        _safe_job_search(
-            internship_query,
-            'internship',
-            fallback_queries=_build_role_search_fallbacks(target_role, settings.market_region_name, 'internship'),
-        ),
-    )
+    try:
+        (full_time_jobs, full_time_error), (internship_jobs, internship_error) = await asyncio.wait_for(
+            run_market_enrichment(),
+            timeout=settings.market_enrichment_timeout_seconds,
+        )
+    except TimeoutError:
+        full_time_jobs, internship_jobs = [], []
+        full_time_error = 'Timed out while loading live full-time market data.'
+        internship_error = 'Timed out while loading live internship market data.'
     market_elapsed_ms = round((time.perf_counter() - market_started_at) * 1000, 2)
 
     full_time_analysis['careerPaths'] = full_time_jobs

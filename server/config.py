@@ -40,6 +40,9 @@ class Settings:
     max_upload_size_bytes = int(os.getenv('MAX_UPLOAD_SIZE_BYTES', str(5 * 1024 * 1024)))
     minimum_resume_words = int(os.getenv('MINIMUM_RESUME_WORDS', '60'))
     sentence_model_name = os.getenv('SENTENCE_MODEL_NAME', 'sentence-transformers/all-MiniLM-L6-v2')
+    job_search_timeout_seconds = float(os.getenv('JOB_SEARCH_TIMEOUT_SECONDS', '8'))
+    job_search_max_candidates = int(os.getenv('JOB_SEARCH_MAX_CANDIDATES', '3'))
+    market_enrichment_timeout_seconds = float(os.getenv('MARKET_ENRICHMENT_TIMEOUT_SECONDS', '12'))
     market_country_code = os.getenv('MARKET_COUNTRY_CODE', os.getenv('JSEARCH_COUNTRY', 'in')).strip().lower() or 'in'
     market_region_name = os.getenv('MARKET_REGION_NAME', 'India').strip() or 'India'
     market_timezone = os.getenv('MARKET_TIMEZONE', 'Asia/Kolkata').strip() or 'Asia/Kolkata'

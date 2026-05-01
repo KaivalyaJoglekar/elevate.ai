@@ -4,6 +4,7 @@ import asyncio
 import base64
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Coroutine
 from uuid import uuid4
 
 import uvicorn
@@ -47,6 +48,7 @@ if settings.sentry_dsn:
         pass
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
+_background_tasks: set[asyncio.Task[None]] = set()
 
 
 
@@ -85,6 +87,80 @@ def _get_client_ip(request: Request) -> str:
     if request.client and request.client.host:
         return request.client.host
     return 'unknown'
+
+
+def _schedule_background_task(coroutine: Coroutine[object, object, None]) -> None:
+    task = asyncio.create_task(coroutine)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+async def _run_analysis_task(
+    *,
+    task_id: str,
+    contents: bytes,
+    filename: str,
+    target_role: str,
+    experience_level: str,
+    job_description: str,
+    cache_hash: str,
+) -> None:
+    try:
+        update_task(task_id, status='processing', progress=14, current_step='Parsing resume')
+        resume_text, parsing_method = await asyncio.to_thread(
+            extract_text_with_fallback,
+            contents,
+            filename,
+        )
+        await asyncio.to_thread(validate_resume_text_quality, resume_text)
+
+        update_task(task_id, status='processing', progress=52, current_step='Running Gemini analysis')
+        result = await run_resume_review(
+            resume_text=resume_text,
+            target_role=target_role,
+            experience_level=experience_level,
+            job_description=job_description,
+            parsing_method=parsing_method,
+        )
+        persist_cached_result(cache_hash, result)
+        update_task(
+            task_id,
+            status='completed',
+            progress=100,
+            current_step='Dashboard ready',
+            result=result,
+        )
+    except Exception as exc:
+        update_task(task_id, status='failed', progress=100, current_step='Analysis failed', error=str(exc))
+
+
+async def _run_retarget_task(
+    *,
+    task_id: str,
+    resume_text: str,
+    target_role: str,
+    experience_level: str,
+    job_description: str,
+    parsing_method: str,
+) -> None:
+    try:
+        update_task(task_id, status='processing', progress=24, current_step='Reframing target role')
+        result = await run_resume_review(
+            resume_text=resume_text,
+            target_role=target_role,
+            experience_level=experience_level,
+            job_description=job_description,
+            parsing_method=parsing_method,
+        )
+        update_task(
+            task_id,
+            status='completed',
+            progress=100,
+            current_step='Dashboard ready',
+            result=result,
+        )
+    except Exception as exc:
+        update_task(task_id, status='failed', progress=100, current_step='Analysis failed', error=str(exc))
 
 
 @app.exception_handler(RequestValidationError)
@@ -160,35 +236,25 @@ async def create_analysis_task(request: Request):
             error=None,
         )
 
-    try:
-        update_task(task_id, status='processing', progress=14, current_step='Parsing resume')
-        resume_text, parsing_method = await asyncio.to_thread(
-            extract_text_with_fallback,
-            contents,
-            file.filename,
-        )
-        await asyncio.to_thread(validate_resume_text_quality, resume_text)
-
-        update_task(task_id, status='processing', progress=52, current_step='Running Gemini analysis')
-        result = await run_resume_review(
-            resume_text=resume_text,
+    payload = update_task(
+        task_id,
+        status='queued',
+        progress=6,
+        current_step='Resume received',
+        error=None,
+    )
+    _schedule_background_task(
+        _run_analysis_task(
+            task_id=task_id,
+            contents=contents,
+            filename=file.filename,
             target_role=target_role,
             experience_level=experience_level,
             job_description=job_description,
-            parsing_method=parsing_method,
+            cache_hash=cache_hash,
         )
-        persist_cached_result(cache_hash, result)
-        payload = update_task(
-            task_id,
-            status='completed',
-            progress=100,
-            current_step='Dashboard ready',
-            result=result,
-        )
-        return AnalysisStatusPayload(**payload)
-    except Exception as exc:
-        update_task(task_id, status='failed', progress=100, current_step='Analysis failed', error=str(exc))
-        raise HTTPException(status_code=503, detail=f'Analysis failed: {exc}') from exc
+    )
+    return AnalysisStatusPayload(**payload)
 
 
 @app.get('/api/analysis/{task_id}', response_model=AnalysisStatusPayload)
@@ -217,27 +283,24 @@ async def retarget_analysis(task_id: str, request: RetargetRequest):
 
     new_task_id = str(uuid4())
     initialize_task_state(new_task_id)
-
-    try:
-        update_task(new_task_id, status='processing', progress=24, current_step='Reframing target role')
-        result = await run_resume_review(
+    payload = update_task(
+        new_task_id,
+        status='queued',
+        progress=8,
+        current_step='Re-target request accepted',
+        error=None,
+    )
+    _schedule_background_task(
+        _run_retarget_task(
+            task_id=new_task_id,
             resume_text=resume_text,
             target_role=target_role,
             experience_level=experience_level,
             job_description=job_description,
             parsing_method=parsing_method,
         )
-        payload = update_task(
-            new_task_id,
-            status='completed',
-            progress=100,
-            current_step='Dashboard ready',
-            result=result,
-        )
-        return AnalysisStatusPayload(**payload)
-    except Exception as exc:
-        update_task(new_task_id, status='failed', progress=100, current_step='Analysis failed', error=str(exc))
-        raise HTTPException(status_code=503, detail=f'Retarget analysis failed: {exc}') from exc
+    )
+    return AnalysisStatusPayload(**payload)
 
 
 @app.websocket('/ws/status/{task_id}')
