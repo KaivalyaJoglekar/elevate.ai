@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from main import app
+from redis_store import StorageUnavailableError
 
 
 def _analysis_result(target_role: str) -> dict:
@@ -172,6 +173,9 @@ class ApiEndpointTests(unittest.TestCase):
             patch("main.enforce_daily_rate_limit", return_value=(True, 5)),
             patch("main.initialize_task_state"),
             patch("main.maybe_return_cached", return_value=None),
+            patch("main.settings.auto_market_enrichment_enabled", True),
+            patch("main.using_local_memory_store", return_value=True),
+            patch("main.set_resume_text"),
             patch("main.extract_text_with_fallback", return_value=("Python FastAPI SQL resume text", "pdfplumber")),
             patch("main.validate_resume_text_quality", return_value=120),
             patch("main.persist_cached_result"),
@@ -207,6 +211,40 @@ class ApiEndpointTests(unittest.TestCase):
         self.assertFalse(update_calls[-1]["result"]["job_market_pending"])
         response.close()
 
+    def test_analyze_endpoint_offloads_upload_payload_when_redis_store_is_available(self) -> None:
+        scheduled_tasks = []
+        analysis_task_mock = AsyncMock(return_value=None)
+
+        def capture_task(coroutine) -> None:
+            scheduled_tasks.append(coroutine)
+
+        with (
+            patch("main.enforce_daily_rate_limit", return_value=(True, 5)),
+            patch("main.initialize_task_state"),
+            patch("main.maybe_return_cached", return_value=None),
+            patch("main.using_local_memory_store", return_value=False),
+            patch("main.set_upload_blob") as set_upload_blob_mock,
+            patch("main.update_task", side_effect=lambda task_id, **kwargs: _task_payload(task_id, **kwargs)),
+            patch("main._run_analysis_task", new=analysis_task_mock),
+            patch("main._schedule_background_task", side_effect=capture_task),
+        ):
+            response = self.client.post(
+                "/api/analyze",
+                files={"file": ("resume.pdf", b"%PDF-1.4 test pdf", "application/pdf")},
+                data={
+                    "target_role": "Backend Engineer",
+                    "experience_level": "Entry Level",
+                    "job_description": "Looking for Python and FastAPI skills.",
+                },
+            )
+            self.assertEqual(len(scheduled_tasks), 1)
+            asyncio.run(scheduled_tasks[0])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(analysis_task_mock.call_args.kwargs["contents"])
+        set_upload_blob_mock.assert_called_once()
+        response.close()
+
     def test_retarget_endpoint_reuses_existing_resume_text(self) -> None:
         update_calls: list[dict] = []
         scheduled_tasks = []
@@ -231,7 +269,9 @@ class ApiEndpointTests(unittest.TestCase):
 
         with (
             patch("main.get_task_status", new=AsyncMock(return_value=existing_payload)),
+            patch("main.settings.auto_market_enrichment_enabled", True),
             patch("main.initialize_task_state"),
+            patch("main.set_resume_text"),
             patch("main.update_task", side_effect=fake_update_task),
             patch("main.build_resume_review_core", new=core_analysis_mock),
             patch("main.enrich_resume_review_market", new=enrich_analysis_mock),
@@ -262,6 +302,71 @@ class ApiEndpointTests(unittest.TestCase):
         self.assertEqual(update_calls[-1]["current_step"], "Dashboard ready")
         self.assertEqual(update_calls[-1]["result"]["target_role"], "Data Analyst")
         self.assertFalse(update_calls[-1]["result"]["job_market_pending"])
+        response.close()
+
+    def test_retarget_endpoint_uses_stored_resume_text_when_public_result_is_sanitized(self) -> None:
+        update_calls: list[dict] = []
+        scheduled_tasks = []
+
+        def fake_update_task(task_id: str, **kwargs) -> dict:
+            update_calls.append({"task_id": task_id, **kwargs})
+            return _task_payload(task_id, **kwargs)
+
+        def capture_task(coroutine) -> None:
+            scheduled_tasks.append(coroutine)
+
+        core_analysis_mock = AsyncMock(return_value=_pending_analysis_result("Data Analyst"))
+        enrich_analysis_mock = AsyncMock(return_value=_analysis_result("Data Analyst"))
+        existing_payload = {
+            "result": {
+                "target_role": "Backend Engineer",
+                "experience_level": "Entry Level",
+                "parsing_method": "pdfplumber",
+            }
+        }
+
+        with (
+            patch("main.get_task_status", new=AsyncMock(return_value=existing_payload)),
+            patch("main.get_resume_text", return_value="Original parsed resume text"),
+            patch("main.settings.auto_market_enrichment_enabled", True),
+            patch("main.initialize_task_state"),
+            patch("main.set_resume_text"),
+            patch("main.update_task", side_effect=fake_update_task),
+            patch("main.build_resume_review_core", new=core_analysis_mock),
+            patch("main.enrich_resume_review_market", new=enrich_analysis_mock),
+            patch("main._schedule_background_task", side_effect=capture_task),
+        ):
+            response = self.client.post(
+                "/api/re-target/original-task",
+                json={
+                    "target_role": "Data Analyst",
+                    "experience_level": "Entry Level",
+                    "job_description": "Looking for SQL and analytics experience.",
+                },
+            )
+            self.assertEqual(len(scheduled_tasks), 1)
+            asyncio.run(scheduled_tasks[0])
+            self.assertEqual(len(scheduled_tasks), 2)
+            asyncio.run(scheduled_tasks[1])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(core_analysis_mock.await_args.kwargs["resume_text"], "Original parsed resume text")
+        self.assertEqual(update_calls[-1]["result"]["target_role"], "Data Analyst")
+        response.close()
+
+    def test_storage_unavailable_returns_503(self) -> None:
+        with (
+            patch("main.enforce_daily_rate_limit", return_value=(True, 5)),
+            patch("main.initialize_task_state", side_effect=StorageUnavailableError("Redis is down")),
+        ):
+            response = self.client.post(
+                "/api/analyze",
+                files={"file": ("resume.pdf", b"%PDF-1.4 test pdf", "application/pdf")},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "STATE_STORE_UNAVAILABLE")
         response.close()
 
     def test_job_search_aliases_delegate_to_backend_search(self) -> None:

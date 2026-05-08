@@ -7,6 +7,7 @@
   restartPolicyType = "always"
 
 [environment]
+  NIXPACKS_PYTHON_VERSION = "3.13"
   PYTHONUNBUFFERED = "1"
 
 # Tell Railway to only deploy the server directory

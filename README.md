@@ -98,9 +98,12 @@ The backend also normalizes whitespace and enforces a minimum readable-word thre
 
 ### 5. AI analysis
 
-The main analysis orchestrator is `run_resume_review()` in `server/service_logic.py`.
+The main analysis orchestration lives in `server/service_logic.py`, primarily through:
 
-This function:
+- `build_resume_review_core()`
+- `enrich_resume_review_market()`
+
+These functions:
 
 - Builds a Gemini prompt with India-market context
 - Requests a structured JSON response
@@ -255,21 +258,11 @@ This repo contains both active production flow code and alternate or legacy infr
 - `server/career_mapper.py`
 - `server/redis_store.py`
 
-### Present in the repo, but not the main UI path today
+### Runtime notes
 
-- `WS /ws/status/{task_id}`
-- `POST /analyze-resume-dual/`
-- `server/analysis_runner.py`
-- `server/celery_app.py`
-- `server/celery_worker.py`
-- `service_clients.route_resume_analysis()`
-
-What that means in practice:
-
-- The frontend currently uses REST polling, not websockets
-- The main upload flow currently runs inline in `POST /api/analyze`
-- The Celery worker path exists, but the current UI does not dispatch work to it
-- The worker-oriented path can generate rewritten bullets and a tailored PDF, but that is not the main web flow today
+- The frontend currently uses REST polling
+- The main upload flow runs through `POST /api/analyze`
+- Job search can run locally or through the optional jobs-service proxy
 
 ## Repository Structure
 
@@ -306,10 +299,7 @@ What that means in practice:
 │   ├── api_clients.py                 # JSearch integration
 │   ├── career_mapper.py               # Deterministic job-to-opportunity mapping
 │   ├── redis_store.py                 # Redis or in-memory task/cache store
-│   ├── service_clients.py             # Optional distributed service gateway logic
-│   ├── analysis_runner.py             # Alternate worker-oriented analysis path
-│   ├── celery_app.py
-│   ├── celery_worker.py
+│   ├── service_clients.py             # Optional jobs-service gateway logic
 │   ├── models.py
 │   ├── config.py
 │   ├── requirements.txt
@@ -467,9 +457,6 @@ There is no SQL database in the current project.
 | `/health` | `GET` | No | Service health and runtime mode |
 | `/api/health` | `GET` | No | Alias for health |
 | `/api/re-target/{task_id}` | `POST` | Yes | Re-run analysis with a new target role/job description |
-| `/ws/status/{task_id}` | `WS` | No | Push task-status updates over websocket |
-| `/api/download/{task_id}` | `GET` | No | Download a generated PDF from the worker-oriented path |
-| `/analyze-resume-dual/` | `POST` | No | Legacy sync-style dual analysis route |
 | `/` | `GET` | No | Root status payload |
 
 ## Caching, State, And Rate Limits
@@ -531,7 +518,6 @@ Common optional backend settings:
 - `GEMINI_MAX_RETRIES`
 - `GEMINI_RETRY_BACKOFF_SECONDS`
 - `SENTRY_DSN`
-- `PUBLIC_BACKEND_URL`
 - `RESULT_TTL_SECONDS`
 - `CACHE_TTL_SECONDS`
 - `UPLOAD_BLOB_TTL_SECONDS`
@@ -544,12 +530,10 @@ Common optional backend settings:
 - `MARKET_REGION_NAME`
 - `MARKET_TIMEZONE`
 - `MARKET_CURRENCY`
-- `GENERATED_RESUME_DIR`
 - `UPSTASH_REDIS_URL`
 - `UPSTASH_REDIS_HOST`
 - `UPSTASH_REDIS_PORT`
 - `UPSTASH_REDIS_PASSWORD`
-- `ANALYSIS_SERVICE_URL`
 - `JOBS_SERVICE_URL`
 - `ALLOW_LOCAL_FALLBACK`
 - `SERVICE_TIMEOUT_SECONDS`
@@ -566,7 +550,7 @@ Current defaults make the backend India-first:
 ### Prerequisites
 
 - Node.js 18+ recommended
-- Python 3.11+ recommended
+- Python 3.13 required for the backend
 - A Gemini API key
 - A RapidAPI key for JSearch
 - `tesseract` installed if you want OCR fallback for scanned PDFs
@@ -581,8 +565,8 @@ npm ci
 
 ```bash
 cd server
-python3 -m venv venv
-venv/bin/python -m pip install -r requirements.txt
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 cd ..
 ```
 
@@ -590,7 +574,7 @@ cd ..
 
 ```bash
 cd server
-venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Run the frontend
@@ -611,8 +595,8 @@ npm run dev:all
 
 Important:
 
-- `npm run dev:all` uses `python3 -m uvicorn`
-- It assumes your Python environment is already activated or otherwise available on `PATH`
+- `npm run dev:all` uses `server/.venv/bin/python`
+- Recreate `server/.venv` with `python3.13` if your machine's default `python3` points to `3.14` or newer
 
 ## Scripts
 
@@ -644,7 +628,7 @@ Run backend tests with:
 
 ```bash
 cd server
-venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Frontend checks:
@@ -662,7 +646,7 @@ Verified locally:
 
 - `npm run lint`
 - `npm run build`
-- `cd server && venv/bin/python -m unittest discover -s tests -v`
+- `cd server && .venv/bin/python -m unittest discover -s tests -v`
 
 Verified live with configured external dependencies:
 

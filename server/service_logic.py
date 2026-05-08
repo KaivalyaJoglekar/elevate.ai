@@ -1,5 +1,4 @@
 import asyncio
-import base64
 from datetime import datetime, timezone
 import re
 import time
@@ -11,8 +10,8 @@ from api_clients import fetch_fulltime_jobs_from_jsearch, fetch_internships_from
 from career_mapper import adapt_jsearch_to_career_path
 from config import get_settings
 from resume_pipeline import compute_ats_evaluation
-from resume_pipeline import count_meaningful_words, validate_resume_text_quality
-from utils import build_dual_analysis_prompt, parse_pdf_text
+from resume_pipeline import count_meaningful_words
+from utils import build_dual_analysis_prompt
 
 SOFT_SKILL_QUERY_BLOCKLIST = {
     'adaptability',
@@ -39,31 +38,6 @@ GENERIC_QUERY_STOPWORDS = {
     'a', 'an', 'and', 'for', 'from', 'in', 'into', 'level', 'looking', 'of',
     'on', 'or', 'role', 'roles', 'the', 'to', 'with', 'years', 'year',
 }
-
-
-async def run_dual_resume_analysis(file_content: str) -> dict:
-    try:
-        padded_content = file_content
-        missing_padding = len(padded_content) % 4
-        if missing_padding:
-            padded_content += '=' * (4 - missing_padding)
-
-        pdf_bytes = base64.b64decode(padded_content, validate=True)
-        resume_text = await asyncio.to_thread(parse_pdf_text, pdf_bytes)
-        if not resume_text.strip():
-            raise ValueError("Parsed resume is empty.")
-        validate_resume_text_quality(resume_text)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"File processing error: {exc}") from exc
-
-    return await run_resume_review(
-        resume_text=resume_text,
-        target_role='Software Engineer',
-        experience_level='Entry Level',
-        job_description='',
-        parsing_method='fitz',
-    )
-
 
 async def run_jobs_search(query: str, job_type: str, *, fallback_queries: list[str] | None = None) -> list:
     settings = get_settings()
@@ -441,21 +415,3 @@ async def enrich_resume_review_market(result: dict[str, Any]) -> dict[str, Any]:
     analysis_metadata['timings_ms'] = timings
     updated_result['analysis_metadata'] = analysis_metadata
     return updated_result
-
-
-async def run_resume_review(
-    *,
-    resume_text: str,
-    target_role: str,
-    experience_level: str,
-    job_description: str,
-    parsing_method: str,
-) -> dict[str, Any]:
-    core_result = await build_resume_review_core(
-        resume_text=resume_text,
-        target_role=target_role,
-        experience_level=experience_level,
-        job_description=job_description,
-        parsing_method=parsing_method,
-    )
-    return await enrich_resume_review_market(core_result)

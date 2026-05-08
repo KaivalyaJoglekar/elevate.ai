@@ -16,6 +16,15 @@ load_dotenv()
 settings = get_settings()
 client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
 
+LEGACY_MODEL_ALIASES = {
+    'gemini-1.5-flash': 'gemini-2.5-flash-lite',
+    'gemini-1.5-flash-8b': 'gemini-2.5-flash-lite',
+    'gemini-2.0-flash': 'gemini-2.5-flash',
+    'gemini-2.0-flash-001': 'gemini-2.5-flash',
+    'gemini-2.0-flash-lite': 'gemini-2.5-flash-lite',
+    'gemini-2.0-flash-lite-001': 'gemini-2.5-flash-lite',
+}
+
 
 def _parse_json(text: str) -> dict[str, Any]:
     start = text.find('{')
@@ -38,12 +47,30 @@ def _should_retry(exc: Exception) -> bool:
     return any(marker.lower() in message.lower() for marker in retry_markers)
 
 
+def _is_model_missing_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        'not found' in message
+        or 'does not exist' in message
+        or 'model not found' in message
+        or 'not supported for generatecontent' in message
+    )
+
+
+def _normalize_model_name(model_name: str) -> str:
+    normalized = model_name.strip()
+    if not normalized:
+        return ''
+    return LEGACY_MODEL_ALIASES.get(normalized, normalized)
+
+
 def _candidate_models() -> list[str]:
     models = [settings.gemini_model, *settings.gemini_fallback_models]
     deduped: list[str] = []
     for model in models:
-        if model and model not in deduped:
-            deduped.append(model)
+        normalized = _normalize_model_name(model)
+        if normalized and normalized not in deduped:
+            deduped.append(normalized)
     return deduped
 
 
@@ -53,6 +80,7 @@ def _generate_json(prompt: str) -> dict[str, Any]:
 
     last_error: Exception | None = None
     models = _candidate_models()
+    missing_models: list[str] = []
 
     for model_index, model_name in enumerate(models):
         for attempt in range(settings.gemini_max_retries):
@@ -67,12 +95,22 @@ def _generate_json(prompt: str) -> dict[str, Any]:
                 last_error = exc
                 is_last_attempt = attempt == settings.gemini_max_retries - 1
                 has_fallback_model = model_index < len(models) - 1
+                if _is_model_missing_error(exc):
+                    missing_models.append(model_name)
+                    break
                 if not _should_retry(exc) and not has_fallback_model:
                     raise
                 if not is_last_attempt:
                     time.sleep(settings.gemini_retry_backoff_seconds * (attempt + 1))
                     continue
                 break
+
+    if missing_models and len(set(missing_models)) == len(models):
+        raise RuntimeError(
+            'Current Gemini model configuration is invalid or deprecated. '
+            f'Tried: {", ".join(models)}. '
+            'Update GEMINI_MODEL and GEMINI_FALLBACK_MODELS to supported models.'
+        )
 
     raise RuntimeError(f'Gemini request failed after retries and fallbacks: {last_error}')
 

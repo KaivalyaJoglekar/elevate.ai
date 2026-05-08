@@ -19,8 +19,6 @@ export default function UploadPage() {
     analysisStatus,
     setTaskId,
     setAnalysisStatus,
-    setFileName,
-    setFile: setContextFile,
     setIsLoading: setCtxLoading,
     setError: setContextError,
     isLoading: ctxLoading,
@@ -48,8 +46,6 @@ export default function UploadPage() {
     if (!file) return;
     setCtxLoading(true);
     setContextError(null);
-    setFileName(file.name);
-    setContextFile(file);
 
     try {
       const result = await handleAnalyze({

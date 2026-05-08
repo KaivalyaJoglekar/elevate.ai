@@ -14,10 +14,10 @@ class Settings:
     app_version = '3.0.0'
 
     gemini_api_key = os.getenv('GEMINI_API_KEY', '').strip()
-    gemini_model = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash').strip() or 'gemini-2.0-flash'
+    gemini_model = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash').strip() or 'gemini-2.5-flash'
     gemini_fallback_models = [
         model.strip()
-        for model in os.getenv('GEMINI_FALLBACK_MODELS', 'gemini-1.5-flash,gemini-1.5-flash-8b').split(',')
+        for model in os.getenv('GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash-lite').split(',')
         if model.strip()
     ]
     gemini_max_retries = int(os.getenv('GEMINI_MAX_RETRIES', '3'))
@@ -27,17 +27,20 @@ class Settings:
     upstash_redis_host = os.getenv('UPSTASH_REDIS_HOST', '').strip()
     upstash_redis_port = os.getenv('UPSTASH_REDIS_PORT', '').strip()
     upstash_redis_password = os.getenv('UPSTASH_REDIS_PASSWORD', '').strip()
-    public_backend_url = os.getenv('PUBLIC_BACKEND_URL', 'https://elevate-ai-p0pn.onrender.com').rstrip('/')
 
     result_ttl_seconds = int(os.getenv('RESULT_TTL_SECONDS', str(7 * 24 * 60 * 60)))
     cache_ttl_seconds = int(os.getenv('CACHE_TTL_SECONDS', str(7 * 24 * 60 * 60)))
     upload_blob_ttl_seconds = int(os.getenv('UPLOAD_BLOB_TTL_SECONDS', str(60 * 60)))
     redis_socket_timeout_seconds = float(os.getenv('REDIS_SOCKET_TIMEOUT_SECONDS', '5'))
     redis_connect_timeout_seconds = float(os.getenv('REDIS_CONNECT_TIMEOUT_SECONDS', '5'))
-    task_submit_timeout_seconds = float(os.getenv('TASK_SUBMIT_TIMEOUT_SECONDS', '10'))
+    redis_fallback_to_memory_enabled = os.getenv(
+        'REDIS_FALLBACK_TO_MEMORY_ENABLED',
+        'false' if (upstash_redis_url or (upstash_redis_host and upstash_redis_port and upstash_redis_password)) else 'true',
+    ).lower() in {'1', 'true', 'yes'}
     rate_limit_enabled = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() in {'1', 'true', 'yes'}
     rate_limit_per_day = int(os.getenv('RATE_LIMIT_PER_DAY', '5'))
     max_upload_size_bytes = int(os.getenv('MAX_UPLOAD_SIZE_BYTES', str(5 * 1024 * 1024)))
+    max_concurrent_analyses = max(1, int(os.getenv('MAX_CONCURRENT_ANALYSES', '2')))
     minimum_resume_words = int(os.getenv('MINIMUM_RESUME_WORDS', '60'))
     sentence_model_name = os.getenv('SENTENCE_MODEL_NAME', 'sentence-transformers/all-MiniLM-L6-v2')
     auto_market_enrichment_enabled = os.getenv('AUTO_MARKET_ENRICHMENT_ENABLED', 'true').lower() in {'1', 'true', 'yes'}
@@ -49,7 +52,9 @@ class Settings:
     market_timezone = os.getenv('MARKET_TIMEZONE', 'Asia/Kolkata').strip() or 'Asia/Kolkata'
     market_currency = os.getenv('MARKET_CURRENCY', 'INR').strip().upper() or 'INR'
 
-    generated_resume_dir = os.getenv('GENERATED_RESUME_DIR', '/tmp/elevate-generated')
+    local_memory_store_max_keys = max(32, int(os.getenv('LOCAL_MEMORY_STORE_MAX_KEYS', '128')))
+    local_memory_store_max_bytes = max(1024 * 1024, int(os.getenv('LOCAL_MEMORY_STORE_MAX_BYTES', str(16 * 1024 * 1024))))
+    local_memory_store_max_ttl_seconds = max(60, int(os.getenv('LOCAL_MEMORY_STORE_MAX_TTL_SECONDS', str(60 * 60))))
 
     def has_redis_config(self) -> bool:
         return bool(

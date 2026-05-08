@@ -14,6 +14,7 @@ from config import get_settings
 from redis_store import (
     get_cached_analysis,
     get_sync_redis,
+    set_resume_text,
     rate_limit_key,
     set_cached_analysis,
     set_task_status,
@@ -146,8 +147,8 @@ def extract_text_with_fallback(file_bytes: bytes, filename: str) -> tuple[str, s
     try:
         for page in document:
             pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
-            image = Image.open(io.BytesIO(pixmap.tobytes('png')))
-            ocr_chunks.append(pytesseract.image_to_string(image))
+            with Image.open(io.BytesIO(pixmap.tobytes('png'))) as image:
+                ocr_chunks.append(pytesseract.image_to_string(image))
     finally:
         document.close()
 
@@ -403,128 +404,10 @@ def detect_weak_bullets(resume_text: str) -> list[str]:
         if len(bullet.split()) < 7 or not has_metric or not has_action:
             weak.append(bullet)
     return weak[:5]
-
-
-def generate_tailored_pdf(
-    task_id: str,
-    rewritten_bullets: list[dict[str, str]],
-    strengths: list[str],
-    missing_skills: list[str],
-    target_role: str,
-) -> str:
-    from reportlab.lib.pagesizes import LETTER
-    from reportlab.pdfbase.pdfmetrics import stringWidth
-    from reportlab.pdfgen import canvas
-
-    settings = get_settings()
-    output_dir = Path(settings.generated_resume_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f'{task_id}.pdf'
-
-    pdf = canvas.Canvas(str(output_path), pagesize=LETTER)
-    width, height = LETTER
-    margin = 54
-    cursor_y = height - margin
-
-    def draw_heading(text: str) -> None:
-        nonlocal cursor_y
-        pdf.setFont('Helvetica-Bold', 16)
-        pdf.drawString(margin, cursor_y, text)
-        cursor_y -= 22
-
-    def draw_body(lines: list[str]) -> None:
-        nonlocal cursor_y
-        pdf.setFont('Helvetica', 10.5)
-        max_width = width - (margin * 2)
-        for line in lines:
-            wrapped = wrap_text(line, max_width)
-            for segment in wrapped:
-                if cursor_y < margin:
-                    pdf.showPage()
-                    cursor_y = height - margin
-                    pdf.setFont('Helvetica', 10.5)
-                pdf.drawString(margin, cursor_y, segment)
-                cursor_y -= 15
-            cursor_y -= 4
-
-    draw_heading(f'Elevate.ai Tailored Resume Notes - {target_role}')
-    draw_body([f'Generated at {datetime.now(timezone.utc).isoformat()}'])
-    draw_heading('Rewritten Bullets')
-    draw_body([item.get('rewritten', '') for item in rewritten_bullets] or ['No rewritten bullets generated.'])
-    draw_heading('Strengths')
-    draw_body(strengths or ['No strengths identified.'])
-    draw_heading('Missing Skills')
-    draw_body(missing_skills or ['No missing skills identified.'])
-    pdf.save()
-
-    return str(output_path)
-
-
-def wrap_text(text: str, max_width: float, font_name: str = 'Helvetica', font_size: float = 10.5) -> list[str]:
-    from reportlab.pdfbase.pdfmetrics import stringWidth
-
-    words = text.split()
-    if not words:
-        return ['']
-
-    lines: list[str] = []
-    current = words[0]
-    for word in words[1:]:
-        candidate = f'{current} {word}'
-        if stringWidth(candidate, font_name, font_size) <= max_width:
-            current = candidate
-        else:
-            lines.append(current)
-            current = word
-    lines.append(current)
-    return lines
-
-
-def build_result_payload(
-    *,
-    resume_text: str,
-    target_role: str,
-    experience_level: str,
-    job_description: str,
-    parsing_method: str,
-    evaluation: dict[str, Any],
-    extraction: dict[str, Any],
-    rewritten_bullets: list[dict[str, str]],
-    download_url: str,
-) -> dict[str, Any]:
-    settings = get_settings()
-    return {
-        'target_role': target_role,
-        'experience_level': experience_level,
-        'job_description_excerpt': evaluation.get('reference_text_excerpt', job_description[:400]),
-        'resume_excerpt': resume_text[:800],
-        'parsing_method': parsing_method,
-        'ats_score': evaluation['ats_score'],
-        'semantic_similarity': evaluation['semantic_similarity'],
-        'score_breakdown': {
-            'semantic_alignment': evaluation['semantic_score'],
-            'keyword_coverage': evaluation['keyword_score'],
-            'bullet_strength': evaluation['bullet_score'],
-        },
-        'matched_keywords': evaluation['matched_keywords'],
-        'missing_keywords': evaluation['missing_keywords'],
-        'missing_skills': extraction.get('missing_skills', []),
-        'strengths': extraction.get('strengths', []),
-        'weak_bullets': extraction.get('weak_bullets', []),
-        'rewritten_bullets': rewritten_bullets,
-        'tailored_resume_download_url': download_url,
-        'market_context': {
-            'country_code': settings.market_country_code,
-            'region_name': settings.market_region_name,
-            'timezone': settings.market_timezone,
-            'currency': settings.market_currency,
-        },
-        'analysis_metadata': {
-            'backend_version': settings.app_version,
-            'generated_at_utc': datetime.now(timezone.utc).isoformat(),
-            'resume_word_count': count_meaningful_words(resume_text),
-        },
-    }
+def prepare_result_for_response(result: dict[str, Any]) -> dict[str, Any]:
+    public_result = dict(result)
+    public_result.pop('resume_text_raw', None)
+    return public_result
 
 
 def maybe_return_cached(cache_hash: str, task_id: str) -> dict[str, Any] | None:
@@ -533,15 +416,19 @@ def maybe_return_cached(cache_hash: str, task_id: str) -> dict[str, Any] | None:
         return None
     if not should_cache_result(cached):
         return None
+    resume_text = str(cached.get('resume_text_raw', '')).strip()
+    if resume_text:
+        set_resume_text(task_id, resume_text)
+    public_result = prepare_result_for_response(cached)
     update_task(
         task_id,
         status='completed',
         progress=100,
         current_step='Cached analysis found',
-        result=cached,
+        result=public_result,
         cached=True,
     )
-    return cached
+    return public_result
 
 
 def should_cache_result(result: dict[str, Any]) -> bool:

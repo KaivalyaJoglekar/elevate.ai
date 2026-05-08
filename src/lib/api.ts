@@ -85,6 +85,8 @@ export const fetchJobs = async (
   jobType: JobSearchType,
   signal?: AbortSignal
 ): Promise<CareerPath[]> => {
+  await warmupBackend(signal);
+
   const response = await fetch(`${API_BASE_URL}/fetch-jobs/`, {
     method: "POST",
     headers: {

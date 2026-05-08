@@ -5,19 +5,29 @@ import base64
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 from collections.abc import Coroutine
 from uuid import uuid4
+from weakref import WeakKeyDictionary
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 
 from config import get_settings
-from models import AnalysisStatusPayload, JobSearchRequest, ResumeRequest, RetargetRequest
-from redis_store import get_sync_redis, get_task_status, using_local_memory_store
+from models import AnalysisStatusPayload, JobSearchRequest, RetargetRequest
+from redis_store import (
+    StorageUnavailableError,
+    delete_upload_blob,
+    get_resume_text,
+    get_sync_redis,
+    get_task_status,
+    get_upload_blob,
+    set_resume_text,
+    set_upload_blob,
+    using_local_memory_store,
+)
 from resume_pipeline import (
     compute_payload_hash,
     enforce_daily_rate_limit,
@@ -25,11 +35,12 @@ from resume_pipeline import (
     initialize_task_state,
     maybe_return_cached,
     persist_cached_result,
+    prepare_result_for_response,
     update_task,
     validate_resume_text_quality,
 )
 from service_clients import get_gateway_health, route_job_search
-from service_logic import build_resume_review_core, enrich_resume_review_market, run_resume_review
+from service_logic import build_resume_review_core, enrich_resume_review_market
 
 
 settings = get_settings()
@@ -49,6 +60,7 @@ if settings.sentry_dsn:
 
 _log = logging.getLogger('elevate')
 _background_tasks: set[asyncio.Task[None]] = set()
+_analysis_slots: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = WeakKeyDictionary()
 
 
 @asynccontextmanager
@@ -130,6 +142,15 @@ def _schedule_background_task(coroutine: Coroutine[object, object, None]) -> Non
     task.add_done_callback(_background_tasks.discard)
 
 
+def _get_analysis_slots() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    slots = _analysis_slots.get(loop)
+    if slots is None:
+        slots = asyncio.Semaphore(settings.max_concurrent_analyses)
+        _analysis_slots[loop] = slots
+    return slots
+
+
 def _skip_market_enrichment(result: dict[str, object]) -> dict[str, object]:
     skipped_result = dict(result)
     skipped_result['job_market_pending'] = False
@@ -144,52 +165,67 @@ def _skip_market_enrichment(result: dict[str, object]) -> dict[str, object]:
 async def _run_analysis_task(
     *,
     task_id: str,
-    contents: bytes,
+    contents: bytes | None,
     filename: str,
     target_role: str,
     experience_level: str,
     job_description: str,
     cache_hash: str,
 ) -> None:
+    owned_contents = contents
     try:
-        update_task(task_id, status='processing', progress=14, current_step='Parsing resume')
-        resume_text, parsing_method = await asyncio.to_thread(
-            extract_text_with_fallback,
-            contents,
-            filename,
-        )
-        await asyncio.to_thread(validate_resume_text_quality, resume_text)
+        if owned_contents is None:
+            encoded_blob = get_upload_blob(task_id)
+            if not encoded_blob:
+                raise ValueError('Uploaded resume payload expired before processing started.')
+            owned_contents = base64.b64decode(encoded_blob)
 
-        update_task(task_id, status='processing', progress=52, current_step='Running Gemini analysis')
-        result = await build_resume_review_core(
-            resume_text=resume_text,
-            target_role=target_role,
-            experience_level=experience_level,
-            job_description=job_description,
-            parsing_method=parsing_method,
-        )
-        should_auto_enrich_market = settings.auto_market_enrichment_enabled
-        result_to_store = result if should_auto_enrich_market else _skip_market_enrichment(result)
-        if not should_auto_enrich_market:
-            persist_cached_result(cache_hash, result_to_store)
-
-        update_task(
-            task_id,
-            status='completed',
-            progress=100,
-            current_step='Dashboard ready',
-            result=result_to_store,
-        )
-        if should_auto_enrich_market:
-            _schedule_background_task(
-                _run_market_enrichment_task(
-                    task_id=task_id,
-                    result=result,
-                    cache_hash=cache_hash,
-                )
+        async with _get_analysis_slots():
+            update_task(task_id, status='processing', progress=14, current_step='Parsing resume')
+            resume_text, parsing_method = await asyncio.to_thread(
+                extract_text_with_fallback,
+                owned_contents,
+                filename,
             )
+            await asyncio.to_thread(validate_resume_text_quality, resume_text)
+            set_resume_text(task_id, resume_text)
+
+            update_task(task_id, status='processing', progress=52, current_step='Running Gemini analysis')
+            result = await build_resume_review_core(
+                resume_text=resume_text,
+                target_role=target_role,
+                experience_level=experience_level,
+                job_description=job_description,
+                parsing_method=parsing_method,
+            )
+            should_auto_enrich_market = settings.auto_market_enrichment_enabled
+            result_to_store = result if should_auto_enrich_market else _skip_market_enrichment(result)
+            if not should_auto_enrich_market:
+                persist_cached_result(cache_hash, result_to_store)
+
+            update_task(
+                task_id,
+                status='completed',
+                progress=100,
+                current_step='Dashboard ready',
+                result=prepare_result_for_response(result_to_store),
+            )
+            if should_auto_enrich_market:
+                _schedule_background_task(
+                    _run_market_enrichment_task(
+                        task_id=task_id,
+                        result=result,
+                        cache_hash=cache_hash,
+                    )
+                )
     except Exception as exc:
         update_task(task_id, status='failed', progress=100, current_step='Analysis failed', error=str(exc))
+    finally:
+        if contents is None:
+            try:
+                delete_upload_blob(task_id)
+            except Exception:
+                pass
 
 
 async def _run_retarget_task(
@@ -202,31 +238,33 @@ async def _run_retarget_task(
     parsing_method: str,
 ) -> None:
     try:
-        update_task(task_id, status='processing', progress=24, current_step='Reframing target role')
-        result = await build_resume_review_core(
-            resume_text=resume_text,
-            target_role=target_role,
-            experience_level=experience_level,
-            job_description=job_description,
-            parsing_method=parsing_method,
-        )
-        should_auto_enrich_market = settings.auto_market_enrichment_enabled
-        result_to_store = result if should_auto_enrich_market else _skip_market_enrichment(result)
-
-        update_task(
-            task_id,
-            status='completed',
-            progress=100,
-            current_step='Dashboard ready',
-            result=result_to_store,
-        )
-        if should_auto_enrich_market:
-            _schedule_background_task(
-                _run_market_enrichment_task(
-                    task_id=task_id,
-                    result=result,
-                )
+        async with _get_analysis_slots():
+            update_task(task_id, status='processing', progress=24, current_step='Reframing target role')
+            set_resume_text(task_id, resume_text)
+            result = await build_resume_review_core(
+                resume_text=resume_text,
+                target_role=target_role,
+                experience_level=experience_level,
+                job_description=job_description,
+                parsing_method=parsing_method,
             )
+            should_auto_enrich_market = settings.auto_market_enrichment_enabled
+            result_to_store = result if should_auto_enrich_market else _skip_market_enrichment(result)
+
+            update_task(
+                task_id,
+                status='completed',
+                progress=100,
+                current_step='Dashboard ready',
+                result=prepare_result_for_response(result_to_store),
+            )
+            if should_auto_enrich_market:
+                _schedule_background_task(
+                    _run_market_enrichment_task(
+                        task_id=task_id,
+                        result=result,
+                    )
+                )
     except Exception as exc:
         update_task(task_id, status='failed', progress=100, current_step='Analysis failed', error=str(exc))
 
@@ -256,7 +294,7 @@ async def _run_market_enrichment_task(
         status='completed',
         progress=100,
         current_step='Dashboard ready',
-        result=enriched_result,
+        result=prepare_result_for_response(enriched_result),
         error=None,
     )
 
@@ -293,6 +331,20 @@ async def http_exception_handler(_: Request, exc: HTTPException):
     )
 
 
+@app.exception_handler(StorageUnavailableError)
+async def storage_unavailable_exception_handler(_: Request, exc: StorageUnavailableError):
+    return JSONResponse(
+        status_code=503,
+        content={
+            'success': False,
+            'error': {
+                'code': 'STATE_STORE_UNAVAILABLE',
+                'message': str(exc),
+            },
+        },
+    )
+
+
 @app.post('/api/analyze', response_model=AnalysisStatusPayload)
 async def create_analysis_task(request: Request):
     client_ip = _get_client_ip(request)
@@ -309,7 +361,10 @@ async def create_analysis_task(request: Request):
     target_role = str(form.get('target_role', 'Software Engineer') or 'Software Engineer')
     experience_level = str(form.get('experience_level', 'Entry Level') or 'Entry Level')
 
-    contents = await file.read()
+    try:
+        contents = await file.read()
+    finally:
+        await file.close()
     if len(contents) > settings.max_upload_size_bytes:
         raise HTTPException(status_code=413, detail='Resume exceeds the 5MB upload limit.')
     if not file.filename or not file.filename.lower().endswith('.pdf'):
@@ -334,6 +389,11 @@ async def create_analysis_task(request: Request):
             error=None,
         )
 
+    task_contents: bytes | None = contents
+    if not using_local_memory_store():
+        set_upload_blob(task_id, base64.b64encode(contents).decode('ascii'))
+        task_contents = None
+
     payload = update_task(
         task_id,
         status='queued',
@@ -344,7 +404,7 @@ async def create_analysis_task(request: Request):
     _schedule_background_task(
         _run_analysis_task(
             task_id=task_id,
-            contents=contents,
+            contents=task_contents,
             filename=file.filename,
             target_role=target_role,
             experience_level=experience_level,
@@ -371,6 +431,8 @@ async def retarget_analysis(task_id: str, request: RetargetRequest):
 
     existing_result = existing_payload['result']
     resume_text = str(existing_result.get('resume_text_raw', '')).strip()
+    if not resume_text:
+        resume_text = str(get_resume_text(task_id) or '').strip()
     if not resume_text:
         raise HTTPException(status_code=409, detail='The original parsed resume text is unavailable for retargeting.')
 
@@ -399,64 +461,6 @@ async def retarget_analysis(task_id: str, request: RetargetRequest):
         )
     )
     return AnalysisStatusPayload(**payload)
-
-
-@app.websocket('/ws/status/{task_id}')
-async def task_status_socket(websocket: WebSocket, task_id: str):
-    await websocket.accept()
-    previous_payload = None
-    try:
-        while True:
-            payload = await get_task_status(task_id)
-            if payload and payload != previous_payload:
-                await websocket.send_json(payload)
-                previous_payload = payload
-                if payload.get('status') in {'completed', 'failed'}:
-                    break
-            await asyncio.sleep(1)
-    except WebSocketDisconnect:
-        return
-    finally:
-        try:
-            await websocket.close()
-        except RuntimeError:
-            pass
-
-
-@app.get('/api/download/{task_id}')
-async def download_generated_resume(task_id: str):
-    output_path = Path(settings.generated_resume_dir) / f'{task_id}.pdf'
-    if not output_path.exists():
-        raise HTTPException(status_code=404, detail='Generated resume not found.')
-    return FileResponse(output_path, media_type='application/pdf', filename=f'elevate-tailored-{task_id}.pdf')
-
-
-@app.post('/analyze-resume-dual/')
-async def analyze_resume_dual_endpoint(request: ResumeRequest):
-    try:
-        padded_content = request.file_content
-        missing_padding = len(padded_content) % 4
-        if missing_padding:
-            padded_content += '=' * (4 - missing_padding)
-
-        contents = base64.b64decode(padded_content, validate=True)
-        resume_text, parsing_method = await asyncio.to_thread(
-            extract_text_with_fallback,
-            contents,
-            'resume.pdf',
-        )
-        await asyncio.to_thread(validate_resume_text_quality, resume_text)
-        result = await run_resume_review(
-            resume_text=resume_text,
-            target_role='Software Engineer',
-            experience_level='Entry Level',
-            job_description='',
-            parsing_method=parsing_method,
-        )
-        return result
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f'Legacy sync analysis failed: {exc}') from exc
-
 
 @app.post('/fetch-jobs/')
 @app.post('/api/jobs/search')

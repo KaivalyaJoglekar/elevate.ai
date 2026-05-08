@@ -83,7 +83,15 @@ export default function ProcessingOverlay({
   const coldStartLabel = slowStart && displayedProgress < 20
     ? "Waking up server… this may take ~30s on first use"
     : null;
-  const displayedStep = coldStartLabel || currentStepLabel || PROCESSING_STEPS[activeStepIndex]?.label || "Preparing dashboard";
+  const pendingResponseLabel = slowStart && !controlledProgress && displayedProgress >= 94
+    ? "Still waiting for the server response…"
+    : null;
+  const displayedStep =
+    coldStartLabel
+    || pendingResponseLabel
+    || currentStepLabel
+    || PROCESSING_STEPS[activeStepIndex]?.label
+    || "Preparing dashboard";
   const completedStepIndex = displayedProgress >= 100
     ? PROCESSING_STEPS.length - 1
     : Math.max(-1, activeStepIndex - 1);

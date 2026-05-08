@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import FloatingNavbar from "@/components/layout/FloatingNavbar";
 import DashboardTopBar from "@/components/layout/DashboardTopBar";
@@ -21,6 +21,61 @@ import { useResumeContext } from "@/hooks/useResumeContext";
 import { fetchAnalysisStatus, retargetExistingAnalysis } from "@/lib/api";
 import type { AnalysisTrackKey } from "@/types/analysis";
 
+function getFriendlyDashboardError(message?: string | null) {
+  const normalized = (message || "").trim();
+  if (!normalized) {
+    return "The analysis report could not be loaded.";
+  }
+
+  const lowered = normalized.toLowerCase();
+  if (
+    lowered.includes("state_store_unavailable") ||
+    lowered.includes("connection") ||
+    lowered.includes("timeout") ||
+    lowered.includes("timed out")
+  ) {
+    return "The analysis service is taking longer than expected. Please retry in a moment.";
+  }
+
+  if (
+    lowered.includes("gemini") ||
+    lowered.includes("not_found") ||
+    lowered.includes("gateway error") ||
+    lowered.includes("traceback")
+  ) {
+    return "The analysis service hit a temporary issue. Please retry shortly.";
+  }
+
+  return normalized;
+}
+
+function getFriendlyMarketStatus(message?: string | null, marketPending?: boolean) {
+  const normalized = (message || "").trim();
+  if (!normalized) {
+    return marketPending
+      ? "Loading live market roles for this track."
+      : "Live market roles are ready.";
+  }
+
+  const lowered = normalized.toLowerCase();
+  if (lowered.includes("name 'asyncio' is not defined")) {
+    return "Live market roles are temporarily unavailable. You can still search JSearch manually below.";
+  }
+  if (lowered.includes("timed out")) {
+    return "Live market data is taking longer than expected. You can still search JSearch manually below.";
+  }
+  if (
+    lowered.startsWith("live market feed unavailable:") ||
+    lowered.includes("gateway error") ||
+    lowered.includes("requesterror") ||
+    lowered.includes("service unavailable")
+  ) {
+    return "Live market roles are temporarily unavailable. You can still search JSearch manually below.";
+  }
+
+  return normalized;
+}
+
 export default function DashboardTaskPage() {
   const params = useParams<{ taskId: string }>();
   const router = useRouter();
@@ -32,12 +87,21 @@ export default function DashboardTaskPage() {
     setError,
     isLoading,
     setIsLoading,
-    setFile,
-    setFileName,
   } = useResumeContext();
   const [selectedTrack, setSelectedTrack] = useState<AnalysisTrackKey>("full_time_analysis");
   const [isRetargeting, setIsRetargeting] = useState(false);
   const taskId = typeof params.taskId === "string" ? params.taskId : "";
+  const selectedTrackTaskIdRef = useRef<string | null>(null);
+  const latestPayloadSignatureRef = useRef<string | null>(null);
+
+  const applyAnalysisStatus = useCallback((payload: NonNullable<typeof analysisStatus>) => {
+    const nextSignature = JSON.stringify(payload);
+    if (latestPayloadSignatureRef.current === nextSignature) {
+      return;
+    }
+    latestPayloadSignatureRef.current = nextSignature;
+    setAnalysisStatus(payload);
+  }, [setAnalysisStatus]);
 
   useEffect(() => {
     if (!taskId) {
@@ -46,6 +110,7 @@ export default function DashboardTaskPage() {
     }
 
     setTaskId(taskId);
+    latestPayloadSignatureRef.current = null;
   }, [router, setTaskId, taskId]);
 
   useEffect(() => {
@@ -67,7 +132,7 @@ export default function DashboardTaskPage() {
       setIsLoading(true);
       try {
         const payload = await fetchAnalysisStatus(taskId, controller.signal);
-        setAnalysisStatus(payload);
+        applyAnalysisStatus(payload);
         setError(payload.error);
       } catch (fetchError) {
         if (controller.signal.aborted) {
@@ -84,7 +149,7 @@ export default function DashboardTaskPage() {
     void load();
 
     return () => controller.abort();
-  }, [analysisStatus?.task_id, isRetargeting, setAnalysisStatus, setError, setIsLoading, taskId]);
+  }, [analysisStatus?.task_id, applyAnalysisStatus, isRetargeting, setError, setIsLoading, taskId]);
 
   useEffect(() => {
     if (!taskId || !analysisStatus || analysisStatus.task_id !== taskId) {
@@ -106,11 +171,17 @@ export default function DashboardTaskPage() {
     // Safety net: if stuck for > 4 minutes, surface an error
     const POLLING_TIMEOUT_MS = 4 * 60 * 1000;
     const pollingStartedAt = Date.now();
+    const controller = new AbortController();
 
-    const intervalId = window.setInterval(async () => {
+    const pollingDelayMs = analysisStatus.status === "completed" ? 2500 : 1500;
+
+    let timeoutId = window.setTimeout(async function poll() {
+      if (controller.signal.aborted) {
+        return;
+      }
+
       // Timeout guard: stop polling if stuck too long
       if (Date.now() - pollingStartedAt > POLLING_TIMEOUT_MS) {
-        window.clearInterval(intervalId);
         setIsLoading(false);
         setError(
           "Analysis is taking longer than expected. The server may be overloaded — please try again in a minute."
@@ -119,21 +190,31 @@ export default function DashboardTaskPage() {
       }
 
       try {
-        const payload = await fetchAnalysisStatus(taskId);
-        setAnalysisStatus(payload);
+        const payload = await fetchAnalysisStatus(taskId, controller.signal);
+        applyAnalysisStatus(payload);
         setError(payload.error);
       } catch (pollError) {
+        if (controller.signal.aborted) {
+          return;
+        }
         // Transient network errors (Render waking up): don't abort, just log
         console.warn("Polling error (will retry):", pollError);
       }
-    }, analysisStatus.status === "completed" ? 2500 : 1500);
+      timeoutId = window.setTimeout(poll, pollingDelayMs);
+    }, pollingDelayMs);
 
-    return () => window.clearInterval(intervalId);
-  }, [analysisStatus, isRetargeting, setAnalysisStatus, setError, setIsLoading, taskId]);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
+  }, [analysisStatus, applyAnalysisStatus, isRetargeting, setError, setIsLoading, taskId]);
 
   useEffect(() => {
     const result = analysisStatus?.result;
     if (!result) {
+      return;
+    }
+    if (selectedTrackTaskIdRef.current === analysisStatus?.task_id) {
       return;
     }
 
@@ -141,7 +222,8 @@ export default function DashboardTaskPage() {
       ? "internship_analysis"
       : "full_time_analysis";
     setSelectedTrack(defaultTrack);
-  }, [analysisStatus?.result]);
+    selectedTrackTaskIdRef.current = analysisStatus?.task_id ?? null;
+  }, [analysisStatus?.result, analysisStatus?.task_id]);
 
   const activeResult = analysisStatus?.result;
   const activeAnalysis = useMemo(() => {
@@ -159,13 +241,15 @@ export default function DashboardTaskPage() {
   const activeMarketQuery = selectedTrack === "full_time_analysis"
     ? activeResult?.full_time_query
     : activeResult?.internship_query;
+  const friendlyMarketStatus = getFriendlyMarketStatus(activeResult?.job_market_status, isMarketPending);
+  const friendlyDashboardError = getFriendlyDashboardError(analysisStatus?.error || error);
 
   const handleNewAnalysis = () => {
     setTaskId(null);
     setAnalysisStatus(null);
     setError(null);
-    setFile(null);
-    setFileName(null);
+    selectedTrackTaskIdRef.current = null;
+    latestPayloadSignatureRef.current = null;
     router.push("/");
   };
 
@@ -188,6 +272,8 @@ export default function DashboardTaskPage() {
         job_description: payload.jobDescription,
       });
       setTaskId(nextPayload.task_id);
+      selectedTrackTaskIdRef.current = null;
+      latestPayloadSignatureRef.current = null;
       setAnalysisStatus(nextPayload);
       setError(nextPayload.error);
       router.push(`/dashboard/${nextPayload.task_id}`);
@@ -212,7 +298,11 @@ export default function DashboardTaskPage() {
     <>
       <ProcessingOverlay
         isVisible={showOverlay}
-        currentStepLabel={isRetargeting ? "Re-targeting for your new role" : analysisStatus?.current_step}
+        currentStepLabel={isRetargeting
+          ? "Re-targeting for your new role"
+          : isMarketPending
+            ? "Gathering job market data"
+            : analysisStatus?.current_step}
         progress={isRetargeting ? undefined : analysisStatus?.progress}
       />
       <FloatingNavbar showNewAnalysis onNewAnalysis={handleNewAnalysis} />
@@ -232,7 +322,7 @@ export default function DashboardTaskPage() {
           <div className="pt-16">
             <ErrorState
               title={analysisStatus?.status === "failed" ? "Analysis failed" : "Analysis unavailable"}
-              message={analysisStatus?.error || error || "The analysis report could not be loaded."}
+              message={friendlyDashboardError}
               onRetry={handleNewAnalysis}
             />
           </div>
@@ -255,7 +345,7 @@ export default function DashboardTaskPage() {
                 targetRole={activeResult?.target_role}
                 experienceLevel={activeResult?.experience_level}
                 marketRegion={activeResult?.market_context?.region_name}
-                marketStatus={activeResult?.job_market_status}
+                marketStatus={friendlyMarketStatus}
                 marketPending={activeResult?.job_market_pending}
                 marketLive={activeResult?.job_market_live}
                 fullTimeJobCount={activeResult?.full_time_job_count}
@@ -353,8 +443,8 @@ export default function DashboardTaskPage() {
               >
                 <p className="text-sm text-ev-text-secondary">
                   {isMarketPending
-                    ? activeResult?.job_market_status || "Loading live market opportunities in the background."
-                    : activeResult?.job_market_status || "No live role matches are available for this track yet. You can still search manually below."}
+                    ? friendlyMarketStatus
+                    : friendlyMarketStatus || "No live role matches are available for this track yet. You can still search manually below."}
                 </p>
               </GlassCard>
             )}

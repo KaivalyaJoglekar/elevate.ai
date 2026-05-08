@@ -8,8 +8,6 @@ const STORAGE_KEY = "elevate:last-analysis";
 
 interface PersistedAnalysisState {
   taskId: string | null;
-  analysisStatus: AnalysisStatusPayload | null;
-  fileName: string | null;
 }
 
 export function ResumeAnalysisProvider({ children }: { children: ReactNode }) {
@@ -18,8 +16,6 @@ export function ResumeAnalysisProvider({ children }: { children: ReactNode }) {
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatusPayload | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -34,8 +30,6 @@ export function ResumeAnalysisProvider({ children }: { children: ReactNode }) {
 
       const parsedState = JSON.parse(rawState) as PersistedAnalysisState;
       setTaskId(parsedState.taskId ?? null);
-      setAnalysisStatus(parsedState.analysisStatus ?? null);
-      setFileName(parsedState.fileName ?? null);
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
     } finally {
@@ -50,18 +44,16 @@ export function ResumeAnalysisProvider({ children }: { children: ReactNode }) {
 
     const nextState: PersistedAnalysisState = {
       taskId,
-      analysisStatus,
-      fileName,
     };
 
-    const hasPersistedData = Boolean(taskId || analysisStatus || fileName);
+    const hasPersistedData = Boolean(taskId);
     if (!hasPersistedData) {
       window.localStorage.removeItem(STORAGE_KEY);
       return;
     }
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-  }, [analysisStatus, fileName, isHydrated, taskId]);
+  }, [isHydrated, taskId]);
 
   return (
     <ResumeAnalysisContext.Provider
@@ -75,10 +67,6 @@ export function ResumeAnalysisProvider({ children }: { children: ReactNode }) {
         setIsLoading,
         error,
         setError,
-        fileName,
-        setFileName,
-        file,
-        setFile,
       }}
     >
       {children}

@@ -55,7 +55,6 @@ export interface AnalysisResult {
   candidate_name: string;
   target_role: string;
   experience_level: string;
-  resume_text_raw?: string;
   job_description_raw?: string;
   job_description_excerpt: string;
   resume_excerpt: string;
@@ -117,8 +116,4 @@ export interface ResumeAnalysisContextType {
   setIsLoading: (isLoading: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
-  fileName: string | null;
-  setFileName: (fileName: string | null) => void;
-  file: File | null;
-  setFile: (file: File | null) => void;
 }

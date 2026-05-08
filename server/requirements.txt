@@ -7,10 +7,8 @@ python-dotenv
 httpx
 google-genai
 python-multipart
-celery[redis]
 redis
 pdfplumber
 pytesseract
 Pillow
-reportlab
 sentry-sdk[fastapi]
