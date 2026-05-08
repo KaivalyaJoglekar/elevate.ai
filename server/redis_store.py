@@ -31,6 +31,19 @@ class LocalRedis:
         if expires_at is not None and expires_at <= time.time():
             _memory_store.pop(key, None)
 
+    def _sweep(self) -> None:
+        now = time.time()
+        to_delete = [k for k, v in _memory_store.items() if v[1] is not None and v[1] <= now]
+        for k in to_delete:
+            _memory_store.pop(k, None)
+
+        # Enforce hard limit to prevent OOM
+        if len(_memory_store) > 1000:
+            # Pop 200 arbitrary keys to keep memory in check
+            keys = list(_memory_store.keys())[:200]
+            for k in keys:
+                _memory_store.pop(k, None)
+
     def get(self, key: str) -> str | None:
         with _memory_lock:
             self._purge_if_expired(key)
@@ -40,6 +53,8 @@ class LocalRedis:
     def set(self, key: str, value: str, ex: int | None = None) -> bool:
         expires_at = time.time() + ex if ex else None
         with _memory_lock:
+            if len(_memory_store) % 100 == 0:
+                self._sweep()
             _memory_store[key] = (value, expires_at)
         return True
 
@@ -52,6 +67,8 @@ class LocalRedis:
     def incr(self, key: str) -> int:
         with _memory_lock:
             self._purge_if_expired(key)
+            if len(_memory_store) % 100 == 0:
+                self._sweep()
             current = _memory_store.get(key)
             current_value = int(current[0]) if current else 0
             new_value = current_value + 1
