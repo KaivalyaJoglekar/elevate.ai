@@ -1,11 +1,14 @@
 import type { AnalysisStatusPayload, CareerPath, JobSearchType } from "@/types/analysis";
 
-const API_BASE_URL = (
+export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   (process.env.NODE_ENV === "production"
     ? "https://elevate-ai-p0pn.onrender.com"
     : "http://127.0.0.1:8000")
 ).replace(/\/$/, "");
+
+/** How long (ms) to wait for backend to wake up before submitting */
+const WAKEUP_TIMEOUT_MS = 25_000;
 
 const parseError = async (response: Response): Promise<string> => {
   try {
@@ -20,10 +23,35 @@ const parseError = async (response: Response): Promise<string> => {
   return `Server error (${response.status})`;
 };
 
+/**
+ * Pings /health until the backend responds (handles Render cold-start ~30s).
+ * Resolves when healthy, rejects after WAKEUP_TIMEOUT_MS.
+ */
+export const warmupBackend = async (signal?: AbortSignal): Promise<void> => {
+  const deadline = Date.now() + WAKEUP_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/health`, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) return;
+    } catch {
+      // Ignore and retry
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  // Don't throw — let the actual request fail with a real error
+};
+
 export const submitAnalysis = async (
   formData: FormData,
   signal?: AbortSignal
 ): Promise<AnalysisStatusPayload> => {
+  // Wake the Render instance before uploading (handles ~30s cold-start)
+  await warmupBackend(signal);
+
   const response = await fetch(`${API_BASE_URL}/api/analyze`, {
     method: "POST",
     body: formData,

@@ -61,6 +61,30 @@ app.add_middleware(
 )
 
 
+@app.on_event('startup')
+async def _startup_checks() -> None:
+    import logging
+    log = logging.getLogger('elevate.startup')
+    if not settings.gemini_api_key:
+        log.critical('[STARTUP] GEMINI_API_KEY is not set — all analysis requests will fail!')
+    else:
+        log.info(f'[STARTUP] Gemini model: {settings.gemini_model} | fallbacks: {settings.gemini_fallback_models}')
+    if not settings.has_redis_config():
+        log.warning(
+            '[STARTUP] No Redis config found (UPSTASH_REDIS_URL / host+port+password). '
+            'Using in-memory store — task state will be lost on restart and will NOT work '
+            'correctly with multiple workers or Render restarts!'
+        )
+    else:
+        log.info('[STARTUP] Redis config detected — connecting to Upstash.')
+    if not settings.gemini_api_key:
+        # Hard fail early so Render shows it clearly in logs
+        raise RuntimeError(
+            'GEMINI_API_KEY environment variable is required but not set. '
+            'Add it in the Render dashboard under Environment Variables.'
+        )
+
+
 def _market_context() -> dict[str, str]:
     return {
         'country_code': settings.market_country_code,

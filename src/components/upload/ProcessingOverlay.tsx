@@ -67,8 +67,23 @@ export default function ProcessingOverlay({
     return 4;
   };
 
+  const [slowStart, setSlowStart] = useState(false);
+
+  // Detect slow start (Render cold-start): show helper message after 10s
+  useEffect(() => {
+    if (!isVisible) {
+      setSlowStart(false);
+      return;
+    }
+    const tid = window.setTimeout(() => setSlowStart(true), 10_000);
+    return () => window.clearTimeout(tid);
+  }, [isVisible]);
+
   const activeStepIndex = resolveStepIndex(controlledProgress ? animatedProgress : displayedProgress);
-  const displayedStep = currentStepLabel || PROCESSING_STEPS[activeStepIndex]?.label || "Preparing dashboard";
+  const coldStartLabel = slowStart && displayedProgress < 20
+    ? "Waking up server… this may take ~30s on first use"
+    : null;
+  const displayedStep = coldStartLabel || currentStepLabel || PROCESSING_STEPS[activeStepIndex]?.label || "Preparing dashboard";
   const completedStepIndex = displayedProgress >= 100
     ? PROCESSING_STEPS.length - 1
     : Math.max(-1, activeStepIndex - 1);

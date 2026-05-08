@@ -103,18 +103,33 @@ export default function DashboardTaskPage() {
       return;
     }
 
+    // Safety net: if stuck for > 4 minutes, surface an error
+    const POLLING_TIMEOUT_MS = 4 * 60 * 1000;
+    const pollingStartedAt = Date.now();
+
     const intervalId = window.setInterval(async () => {
+      // Timeout guard: stop polling if stuck too long
+      if (Date.now() - pollingStartedAt > POLLING_TIMEOUT_MS) {
+        window.clearInterval(intervalId);
+        setIsLoading(false);
+        setError(
+          "Analysis is taking longer than expected. The server may be overloaded — please try again in a minute."
+        );
+        return;
+      }
+
       try {
         const payload = await fetchAnalysisStatus(taskId);
         setAnalysisStatus(payload);
         setError(payload.error);
       } catch (pollError) {
-        setError(pollError instanceof Error ? pollError.message : "Failed to refresh analysis.");
+        // Transient network errors (Render waking up): don't abort, just log
+        console.warn("Polling error (will retry):", pollError);
       }
     }, analysisStatus.status === "completed" ? 2500 : 1500);
 
     return () => window.clearInterval(intervalId);
-  }, [analysisStatus, isRetargeting, setAnalysisStatus, setError, taskId]);
+  }, [analysisStatus, isRetargeting, setAnalysisStatus, setError, setIsLoading, taskId]);
 
   useEffect(() => {
     const result = analysisStatus?.result;

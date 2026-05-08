@@ -14,10 +14,10 @@ class Settings:
     app_version = '3.0.0'
 
     gemini_api_key = os.getenv('GEMINI_API_KEY', '').strip()
-    gemini_model = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash').strip() or 'gemini-2.5-flash'
+    gemini_model = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash').strip() or 'gemini-2.0-flash'
     gemini_fallback_models = [
         model.strip()
-        for model in os.getenv('GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash-lite').split(',')
+        for model in os.getenv('GEMINI_FALLBACK_MODELS', 'gemini-1.5-flash,gemini-1.5-flash-8b').split(',')
         if model.strip()
     ]
     gemini_max_retries = int(os.getenv('GEMINI_MAX_RETRIES', '3'))
