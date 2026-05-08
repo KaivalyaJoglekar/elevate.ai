@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from collections.abc import Coroutine
@@ -11,9 +13,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.responses import FileResponse
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from config import get_settings
 from models import AnalysisStatusPayload, JobSearchRequest, ResumeRequest, RetargetRequest
@@ -47,42 +47,53 @@ if settings.sentry_dsn:
     except ImportError:
         pass
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
+_log = logging.getLogger('elevate')
 _background_tasks: set[asyncio.Task[None]] = set()
 
 
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.on_event('startup')
-async def _startup_checks() -> None:
-    import logging
-    log = logging.getLogger('elevate.startup')
+@asynccontextmanager
+async def _lifespan(app: FastAPI):  # noqa: ARG001
+    """Startup checks + graceful teardown."""
+    # ── Startup ──────────────────────────────────────────────────────────────
     if not settings.gemini_api_key:
-        log.critical('[STARTUP] GEMINI_API_KEY is not set — all analysis requests will fail!')
-    else:
-        log.info(f'[STARTUP] Gemini model: {settings.gemini_model} | fallbacks: {settings.gemini_fallback_models}')
-    if not settings.has_redis_config():
-        log.warning(
-            '[STARTUP] No Redis config found (UPSTASH_REDIS_URL / host+port+password). '
-            'Using in-memory store — task state will be lost on restart and will NOT work '
-            'correctly with multiple workers or Render restarts!'
+        _log.critical(
+            '[STARTUP] GEMINI_API_KEY is not set — all analysis requests will fail! '
+            'Add it in the Render dashboard under Environment Variables.'
         )
-    else:
-        log.info('[STARTUP] Redis config detected — connecting to Upstash.')
-    if not settings.gemini_api_key:
-        # Hard fail early so Render shows it clearly in logs
         raise RuntimeError(
             'GEMINI_API_KEY environment variable is required but not set. '
             'Add it in the Render dashboard under Environment Variables.'
         )
+    _log.info(
+        '[STARTUP] Gemini model: %s | fallbacks: %s',
+        settings.gemini_model,
+        settings.gemini_fallback_models,
+    )
+    if not settings.has_redis_config():
+        _log.warning(
+            '[STARTUP] No Redis config found. Using in-memory store — '
+            'task state WILL be lost on Render restarts!'
+        )
+    else:
+        _log.info('[STARTUP] Redis config detected — connecting to Upstash.')
+
+    yield  # ── Running ────────────────────────────────────────────────────
+
+    # ── Shutdown ─────────────────────────────────────────────────────────────
+    pending = [t for t in _background_tasks if not t.done()]
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+
+
+app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=_lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 
 def _market_context() -> dict[str, str]:
