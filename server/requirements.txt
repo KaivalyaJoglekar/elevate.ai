@@ -12,6 +12,5 @@ redis
 pdfplumber
 pytesseract
 Pillow
-sentence-transformers
 reportlab
 sentry-sdk[fastapi]
