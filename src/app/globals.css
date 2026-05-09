@@ -14,8 +14,8 @@
   --ev-gold: #00D4FF;
   --ev-gold-soft: #7EE8FA;
   --ev-text: #F5F5F0;
-  --ev-text-secondary: #A8A8A0;
-  --ev-text-muted: #6F6F68;
+  --ev-text-secondary: #CBCBC3;
+  --ev-text-muted: #A0A099;
   --ev-border: rgba(0, 212, 255, 0.12);
   --ev-border-strong: rgba(126, 232, 250, 0.24);
 }
@@ -35,6 +35,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ev-text-muted);
+  opacity: 1;
 }
 
 ::selection {

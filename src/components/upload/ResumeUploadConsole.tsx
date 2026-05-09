@@ -9,6 +9,7 @@ interface ResumeUploadConsoleProps {
   file: File | null;
   isDragging: boolean;
   isLoading: boolean;
+  canAnalyze: boolean;
   error: string | null;
   onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -22,6 +23,7 @@ export default function ResumeUploadConsole({
   file,
   isDragging,
   isLoading,
+  canAnalyze,
   error,
   onDrop,
   onDragOver,
@@ -151,12 +153,12 @@ export default function ResumeUploadConsole({
         {/* Analyze button */}
         <motion.button
           onClick={onAnalyze}
-          disabled={!file || isLoading}
-          whileHover={file && !isLoading ? { scale: 1.02 } : undefined}
-          whileTap={file && !isLoading ? { scale: 0.98 } : undefined}
+          disabled={!canAnalyze || isLoading}
+          whileHover={canAnalyze && !isLoading ? { scale: 1.02 } : undefined}
+          whileTap={canAnalyze && !isLoading ? { scale: 0.98 } : undefined}
           className={cn(
             "w-full mt-6 flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200",
-            file && !isLoading
+            canAnalyze && !isLoading
               ? "bg-ev-gold/15 border border-ev-gold/40 text-ev-gold hover:bg-ev-gold/25"
               : "bg-white/[0.03] border border-ev-border text-ev-text-muted cursor-not-allowed"
           )}
@@ -168,7 +170,7 @@ export default function ResumeUploadConsole({
             </>
           ) : (
             <>
-              Generate Intelligence Report
+              Run Analysis
               <ArrowRight className="w-4 h-4" />
             </>
           )}

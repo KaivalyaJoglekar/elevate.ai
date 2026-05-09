@@ -29,6 +29,32 @@ class CareerMapperTests(unittest.TestCase):
         self.assertGreaterEqual(first[0]["matchPercentage"], 60)
         self.assertIn("India", first[0]["matchRationale"])
 
+    def test_mapper_filters_full_time_and_internship_tracks(self) -> None:
+        jobs = [
+            {
+                "job_title": "Backend Engineer",
+                "employer_name": "Acme",
+                "job_description": "Build Python APIs and backend systems.",
+                "job_location": "Bengaluru, Karnataka, India",
+                "job_employment_type": "FULLTIME",
+                "job_apply_link": "https://example.com/backend",
+            },
+            {
+                "job_title": "Backend Engineer Intern",
+                "employer_name": "Acme",
+                "job_description": "Support Python APIs as an intern.",
+                "job_location": "Bengaluru, Karnataka, India",
+                "job_employment_type": "INTERN",
+                "job_apply_link": "https://example.com/backend-intern",
+            },
+        ]
+
+        full_time_paths = adapt_jsearch_to_career_path(jobs, "full-time", ["Backend", "Python", "FastAPI"])
+        internship_paths = adapt_jsearch_to_career_path(jobs, "internship", ["Backend", "Python", "FastAPI"])
+
+        self.assertEqual([path["role"] for path in full_time_paths], ["Backend Engineer"])
+        self.assertEqual([path["role"] for path in internship_paths], ["Backend Engineer Intern"])
+
 
 if __name__ == "__main__":
     unittest.main()

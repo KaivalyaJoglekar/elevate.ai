@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections import OrderedDict
@@ -259,5 +260,12 @@ def get_resume_text(task_id: str) -> str | None:
 
 
 async def get_task_status(task_id: str) -> dict[str, Any] | None:
-    raw = await get_async_redis().get(task_status_key(task_id))
+    try:
+        raw = await asyncio.to_thread(lambda: get_sync_redis().get(task_status_key(task_id)))
+    except StorageUnavailableError:
+        raise
+    except Exception as exc:
+        raise StorageUnavailableError(
+            'The analysis state store is temporarily unavailable. Please retry in a moment.'
+        ) from exc
     return json.loads(raw) if raw else None

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Shield, Zap, TrendingUp, AlertTriangle } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
+import { normalizeLabel } from "@/lib/utils";
 import type { CareerData } from "@/types/analysis";
 
 interface ScoreOverviewGridProps {
@@ -18,26 +19,47 @@ export default function ScoreOverviewGrid({ data }: ScoreOverviewGridProps) {
 
   // Compute avg career match from top 3 paths
   const validPaths = (data.careerPaths || []).filter(
-    (p) => p && p.matchPercentage
+    (p) => p && typeof p.matchPercentage === "number" && Number.isFinite(p.matchPercentage)
   );
   const sortedPaths = [...validPaths].sort(
     (a, b) => b.matchPercentage - a.matchPercentage
   );
   const topPaths = sortedPaths.slice(0, 3);
-  const avgMatch =
-    topPaths.length > 0
-      ? Math.round(
-        topPaths.reduce((sum, p) => sum + p.matchPercentage, 0) /
-        topPaths.length
+  const breakdownMap = new Map(
+    (data.atsScore?.breakdown || []).map((item) => [item.label.toLowerCase(), item.score])
+  );
+  const fallbackCareerFit = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        ((breakdownMap.get("role alignment") ?? atsScore) * 0.65) +
+        ((breakdownMap.get("keyword match") ?? atsScore) * 0.35)
       )
-      : 0;
+    )
+  );
+  const avgMatch = topPaths.length > 0
+    ? Math.round(
+      topPaths.reduce((sum, p) => sum + p.matchPercentage, 0) /
+      topPaths.length
+    )
+    : fallbackCareerFit;
 
   // Compute missing skills count
   const allMissingSkills = new Set<string>();
+  const registerMissingSkill = (value?: string) => {
+    const normalized = normalizeLabel(value || "");
+    if (!normalized) {
+      return;
+    }
+    allMissingSkills.add(normalized.toLowerCase());
+  };
+
+  data.atsScore?.missingKeywords?.forEach((keyword) => registerMissingSkill(keyword));
   validPaths.forEach((p) => {
     p.skillsToDevelop?.forEach((s) => {
       const name = typeof s === "string" ? s : s.name;
-      if (name) allMissingSkills.add(name.toLowerCase());
+      registerMissingSkill(name);
     });
   });
 
@@ -55,7 +77,9 @@ export default function ScoreOverviewGrid({ data }: ScoreOverviewGridProps) {
       value: avgMatch,
       suffix: "%",
       icon: TrendingUp,
-      context: `Avg match across top ${topPaths.length} roles`,
+      context: topPaths.length > 0
+        ? `Avg match across top ${topPaths.length} roles`
+        : "Estimated from ATS role alignment",
       variant: avgMatch >= 80 ? "success" : avgMatch >= 60 ? "gold" : "warning",
     },
     {
@@ -71,7 +95,9 @@ export default function ScoreOverviewGrid({ data }: ScoreOverviewGridProps) {
       value: allMissingSkills.size,
       suffix: "",
       icon: AlertTriangle,
-      context: "Unique skills to develop",
+      context: data.atsScore?.missingKeywords?.length
+        ? "Missing keywords and role-specific skills"
+        : "Unique skills to develop",
       variant: allMissingSkills.size <= 3 ? "success" : allMissingSkills.size <= 6 ? "warning" : "danger",
     },
   ] as const;

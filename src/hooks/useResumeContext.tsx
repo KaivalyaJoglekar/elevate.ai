@@ -8,6 +8,7 @@ const STORAGE_KEY = "elevate:last-analysis";
 
 interface PersistedAnalysisState {
   taskId: string | null;
+  analysisStatus: AnalysisStatusPayload | null;
 }
 
 export function ResumeAnalysisProvider({ children }: { children: ReactNode }) {
@@ -29,7 +30,14 @@ export function ResumeAnalysisProvider({ children }: { children: ReactNode }) {
       }
 
       const parsedState = JSON.parse(rawState) as PersistedAnalysisState;
-      setTaskId(parsedState.taskId ?? null);
+      const persistedTaskId = parsedState.taskId ?? null;
+      const persistedAnalysisStatus =
+        parsedState.analysisStatus && parsedState.analysisStatus.task_id === persistedTaskId
+          ? parsedState.analysisStatus
+          : null;
+
+      setTaskId(persistedTaskId);
+      setAnalysisStatus(persistedAnalysisStatus);
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
     } finally {
@@ -44,16 +52,17 @@ export function ResumeAnalysisProvider({ children }: { children: ReactNode }) {
 
     const nextState: PersistedAnalysisState = {
       taskId,
+      analysisStatus: analysisStatus?.task_id === taskId ? analysisStatus : null,
     };
 
-    const hasPersistedData = Boolean(taskId);
+    const hasPersistedData = Boolean(taskId || nextState.analysisStatus);
     if (!hasPersistedData) {
       window.localStorage.removeItem(STORAGE_KEY);
       return;
     }
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-  }, [isHydrated, taskId]);
+  }, [analysisStatus, isHydrated, taskId]);
 
   return (
     <ResumeAnalysisContext.Provider

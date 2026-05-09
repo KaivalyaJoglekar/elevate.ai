@@ -21,6 +21,8 @@ import { useResumeContext } from "@/hooks/useResumeContext";
 import { fetchAnalysisStatus, retargetExistingAnalysis } from "@/lib/api";
 import type { AnalysisTrackKey } from "@/types/analysis";
 
+const TRACK_STORAGE_PREFIX = "elevate:dashboard-track:";
+
 function getFriendlyDashboardError(message?: string | null) {
   const normalized = (message || "").trim();
   if (!normalized) {
@@ -30,6 +32,8 @@ function getFriendlyDashboardError(message?: string | null) {
   const lowered = normalized.toLowerCase();
   if (
     lowered.includes("state_store_unavailable") ||
+    lowered.includes("state store") ||
+    lowered.includes("redis") ||
     lowered.includes("connection") ||
     lowered.includes("timeout") ||
     lowered.includes("timed out")
@@ -93,6 +97,8 @@ export default function DashboardTaskPage() {
   const taskId = typeof params.taskId === "string" ? params.taskId : "";
   const selectedTrackTaskIdRef = useRef<string | null>(null);
   const latestPayloadSignatureRef = useRef<string | null>(null);
+  const persistedTrackRef = useRef<AnalysisTrackKey | null>(null);
+  const [hasResolvedInitialLoad, setHasResolvedInitialLoad] = useState(false);
 
   const applyAnalysisStatus = useCallback((payload: NonNullable<typeof analysisStatus>) => {
     const nextSignature = JSON.stringify(payload);
@@ -111,7 +117,32 @@ export default function DashboardTaskPage() {
 
     setTaskId(taskId);
     latestPayloadSignatureRef.current = null;
-  }, [router, setTaskId, taskId]);
+    setHasResolvedInitialLoad(Boolean(analysisStatus?.task_id === taskId));
+  }, [analysisStatus?.task_id, router, setTaskId, taskId]);
+
+  useEffect(() => {
+    if (!taskId || typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const persistedTrack = window.localStorage.getItem(`${TRACK_STORAGE_PREFIX}${taskId}`);
+      if (persistedTrack === "full_time_analysis" || persistedTrack === "internship_analysis") {
+        persistedTrackRef.current = persistedTrack;
+        setSelectedTrack(persistedTrack);
+      }
+    } catch {
+      persistedTrackRef.current = null;
+    }
+  }, [taskId]);
+
+  useEffect(() => {
+    if (!taskId || typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(`${TRACK_STORAGE_PREFIX}${taskId}`, selectedTrack);
+  }, [selectedTrack, taskId]);
 
   useEffect(() => {
     if (!taskId) {
@@ -123,6 +154,7 @@ export default function DashboardTaskPage() {
     }
 
     if (analysisStatus?.task_id === taskId) {
+      setHasResolvedInitialLoad(true);
       return;
     }
 
@@ -141,6 +173,7 @@ export default function DashboardTaskPage() {
         setError(fetchError instanceof Error ? fetchError.message : "Failed to load analysis.");
       } finally {
         if (!controller.signal.aborted) {
+          setHasResolvedInitialLoad(true);
           setIsLoading(false);
         }
       }
@@ -218,11 +251,14 @@ export default function DashboardTaskPage() {
       return;
     }
 
-    const defaultTrack = result.experience_level.toLowerCase().includes("intern")
-      ? "internship_analysis"
-      : "full_time_analysis";
+    const defaultTrack = persistedTrackRef.current || (
+      result.experience_level.toLowerCase().includes("intern")
+        ? "internship_analysis"
+        : "full_time_analysis"
+    );
     setSelectedTrack(defaultTrack);
     selectedTrackTaskIdRef.current = analysisStatus?.task_id ?? null;
+    persistedTrackRef.current = null;
   }, [analysisStatus?.result, analysisStatus?.task_id]);
 
   const activeResult = analysisStatus?.result;
@@ -233,9 +269,14 @@ export default function DashboardTaskPage() {
 
     return activeResult[selectedTrack];
   }, [activeResult, selectedTrack]);
+  const hasSkillComparisonData = Boolean(
+    activeAnalysis?.extractedSkills?.length
+    || activeAnalysis?.atsScore?.missingKeywords?.length
+    || activeAnalysis?.careerPaths?.some((path) => path.skillsToDevelop?.length)
+  );
 
   const hasValidPaths = (activeAnalysis?.careerPaths || []).some(
-    (path) => path && path.role && path.matchPercentage
+    (path) => path && path.role && typeof path.matchPercentage === "number" && Number.isFinite(path.matchPercentage)
   );
   const isMarketPending = Boolean(activeResult?.job_market_pending);
   const activeMarketQuery = selectedTrack === "full_time_analysis"
@@ -293,6 +334,11 @@ export default function DashboardTaskPage() {
     isLoading ||
     (analysisStatus?.task_id === taskId &&
       ["queued", "processing"].includes(analysisStatus.status));
+  const isDashboardPending =
+    !hasResolvedInitialLoad ||
+    isLoading ||
+    (analysisStatus?.task_id === taskId &&
+      ["queued", "processing"].includes(analysisStatus.status));
 
   return (
     <>
@@ -305,7 +351,7 @@ export default function DashboardTaskPage() {
             : analysisStatus?.current_step}
         progress={isRetargeting ? undefined : analysisStatus?.progress}
       />
-      <FloatingNavbar showNewAnalysis onNewAnalysis={handleNewAnalysis} />
+      <FloatingNavbar />
 
       <main className="relative mx-auto max-w-[1180px] px-4 pb-16 pt-24 sm:px-6 lg:px-8">
         <motion.div
@@ -320,11 +366,22 @@ export default function DashboardTaskPage() {
         />
         {!activeAnalysis ? (
           <div className="pt-16">
-            <ErrorState
-              title={analysisStatus?.status === "failed" ? "Analysis failed" : "Analysis unavailable"}
-              message={friendlyDashboardError}
-              onRetry={handleNewAnalysis}
-            />
+            {isDashboardPending ? (
+              <GlassCard
+                padding="md"
+                className="dashboard-surface rounded-[24px]"
+              >
+                <p className="text-sm text-ev-text-secondary">
+                  Restoring your latest dashboard view…
+                </p>
+              </GlassCard>
+            ) : (
+              <ErrorState
+                title={analysisStatus?.status === "failed" ? "Analysis failed" : "Analysis unavailable"}
+                message={friendlyDashboardError}
+                onRetry={handleNewAnalysis}
+              />
+            )}
           </div>
         ) : (
           <motion.div
@@ -403,8 +460,14 @@ export default function DashboardTaskPage() {
 
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_320px]">
               <div className="space-y-6">
-                {activeAnalysis.extractedSkills?.length > 0 && (
-                  <SkillIntelligence skills={activeAnalysis.extractedSkills} />
+                {hasSkillComparisonData && (
+                  <SkillIntelligence
+                    skills={activeAnalysis.extractedSkills || []}
+                    targetRole={activeResult?.target_role}
+                    trackLabel={selectedTrack === "full_time_analysis" ? "Full-Time" : "Internship"}
+                    missingKeywords={activeAnalysis.atsScore?.missingKeywords}
+                    careerPaths={activeAnalysis.careerPaths || []}
+                  />
                 )}
 
                 {(activeAnalysis.generalResumeImprovements?.length > 0 ||

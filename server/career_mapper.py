@@ -41,6 +41,10 @@ INDIA_LOCATION_HINTS = {
     "gurugram", "noida", "delhi", "chennai", "kolkata", "ahmedabad",
 }
 
+INTERNSHIP_HINTS = {
+    "intern", "internship", "trainee", "apprentice", "co-op", "coop",
+}
+
 
 def _tokenize(value: str | None) -> list[str]:
     tokens = re.findall(r"[A-Za-z][A-Za-z0-9+.#/-]{1,}", value or "")
@@ -127,6 +131,24 @@ def _recency_bonus(posted_at: str | None) -> int:
     return 0
 
 
+def _is_internship_like_job(job: dict) -> bool:
+    haystack = " ".join(
+        str(value or "").lower()
+        for value in (
+            job.get("job_title"),
+            job.get("job_employment_type"),
+        )
+    )
+    return any(hint in haystack for hint in INTERNSHIP_HINTS)
+
+
+def _matches_requested_job_type(job: dict, job_type: str) -> bool:
+    internship_like = _is_internship_like_job(job)
+    if job_type == "internship":
+        return internship_like
+    return not internship_like
+
+
 def _build_proficiency_analysis(skills: list[str], matched_skills: set[str], job_type: str) -> list[dict]:
     required_base = 74 if job_type == "full-time" else 58
     output: list[dict] = []
@@ -167,11 +189,15 @@ def adapt_jsearch_to_career_path(jsearch_jobs: list, job_type: str, skills_query
     if not jsearch_jobs:
         return []
 
+    relevant_jobs = [job for job in jsearch_jobs if _matches_requested_job_type(job, job_type)]
+    if not relevant_jobs:
+        return []
+
     query_terms = _ordered_unique(skills_query)
     query_skills_set = set(query_terms)
     career_paths = []
 
-    for job in jsearch_jobs[:7]:
+    for job in relevant_jobs[:7]:
         title_terms, description_terms, location_terms = _extract_job_terms(job)
         job_terms = title_terms.union(description_terms).union(location_terms)
 

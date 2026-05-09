@@ -4,6 +4,7 @@
 
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { CareerPath, JobSearchType } from "@/types/analysis";
 
 /**
  * Merge Tailwind classes safely
@@ -55,4 +56,23 @@ export function groupSkillsByCategory(skills: { name: string }[]): Record<string
     groups[category].push(skill);
   }
   return groups;
+}
+
+const INTERNSHIP_HINTS = ["intern", "internship", "trainee", "apprentice", "co-op", "coop"];
+
+export function normalizeLabel(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+export function isInternshipLikeRole(role: string, employmentType?: string | null): boolean {
+  const haystack = `${role} ${employmentType || ""}`.toLowerCase();
+  return INTERNSHIP_HINTS.some((hint) => haystack.includes(hint));
+}
+
+export function matchesRequestedJobType(
+  path: Pick<CareerPath, "role" | "job_employment_type">,
+  jobType: JobSearchType
+): boolean {
+  const internshipLike = isInternshipLikeRole(path.role, path.job_employment_type);
+  return jobType === "internship" ? internshipLike : !internshipLike;
 }

@@ -13,7 +13,10 @@ interface CareerAnalyticsProps {
 }
 
 export default function CareerAnalytics({ careerPaths }: CareerAnalyticsProps) {
-  const validPaths = useMemo(() => careerPaths.filter(p => p && p.role && p.matchPercentage), [careerPaths]);
+  const validPaths = useMemo(
+    () => careerPaths.filter((p) => p && p.role && typeof p.matchPercentage === "number" && Number.isFinite(p.matchPercentage)),
+    [careerPaths]
+  );
   const sorted = useMemo(() => [...validPaths].sort((a, b) => b.matchPercentage - a.matchPercentage), [validPaths]);
   const [selected, setSelected] = useState<CareerPath | null>(sorted[0] || null);
 

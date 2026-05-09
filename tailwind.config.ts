@@ -17,8 +17,8 @@ const config: Config = {
 
         // Text
         "ev-text": "#F5F5F0",
-        "ev-text-secondary": "#A8A8A0",
-        "ev-text-muted": "#6F6F68",
+        "ev-text-secondary": "#CBCBC3",
+        "ev-text-muted": "#A0A099",
 
         // Accent cyan
         "ev-gold": "#00D4FF",

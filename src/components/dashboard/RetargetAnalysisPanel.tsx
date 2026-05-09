@@ -5,6 +5,10 @@ import { ArrowRightLeft, Sparkles } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import SectionHeader from "@/components/ui/SectionHeader";
 
+function normalizeTrackValue(value?: string) {
+  return value?.toLowerCase().includes("intern") ? "Internship" : "Full-Time";
+}
+
 interface RetargetAnalysisPanelProps {
   initialTargetRole?: string;
   initialExperienceLevel?: string;
@@ -19,18 +23,18 @@ interface RetargetAnalysisPanelProps {
 
 export default function RetargetAnalysisPanel({
   initialTargetRole = "Software Engineer",
-  initialExperienceLevel = "Entry Level",
+  initialExperienceLevel = "Full-Time",
   initialJobDescription = "",
   isLoading = false,
   onSubmit,
 }: RetargetAnalysisPanelProps) {
   const [targetRole, setTargetRole] = useState(initialTargetRole);
-  const [experienceLevel, setExperienceLevel] = useState(initialExperienceLevel);
+  const [experienceLevel, setExperienceLevel] = useState(normalizeTrackValue(initialExperienceLevel));
   const [jobDescription, setJobDescription] = useState(initialJobDescription);
 
   useEffect(() => {
     setTargetRole(initialTargetRole);
-    setExperienceLevel(initialExperienceLevel);
+    setExperienceLevel(normalizeTrackValue(initialExperienceLevel));
     setJobDescription(initialJobDescription);
   }, [initialExperienceLevel, initialJobDescription, initialTargetRole]);
 
@@ -38,7 +42,7 @@ export default function RetargetAnalysisPanel({
     event.preventDefault();
     await onSubmit({
       targetRole: targetRole.trim() || "Software Engineer",
-      experienceLevel: experienceLevel.trim() || "Entry Level",
+      experienceLevel: experienceLevel.trim() || "Full-Time",
       jobDescription: jobDescription.trim(),
     });
   };
@@ -49,9 +53,9 @@ export default function RetargetAnalysisPanel({
       className="dashboard-surface rounded-[28px]"
     >
       <SectionHeader
-        label="Re-Target"
-        title="Analyze this resume for a different role"
-        subtitle="Reuse the parsed resume and rerun the report for a new role, level, or job description."
+        label="New Target"
+        title="Run this resume against a different role"
+        subtitle="Reuse the parsed resume and rerun the report for a new role, track, or job description."
       />
 
       <form
@@ -70,15 +74,13 @@ export default function RetargetAnalysisPanel({
           </div>
 
           <div>
-            <label className="section-label block mb-2">Experience Level</label>
+            <label className="section-label block mb-2">Track</label>
             <select
               value={experienceLevel}
               onChange={(event) => setExperienceLevel(event.target.value)}
               className="w-full rounded-xl border border-ev-border bg-white/[0.03] px-4 py-3 text-sm text-ev-text outline-none transition-colors focus:border-ev-gold/40"
             >
-              <option value="Entry Level">Entry Level</option>
-              <option value="Mid Level">Mid Level</option>
-              <option value="Senior Level">Senior Level</option>
+              <option value="Full-Time">Full-Time</option>
               <option value="Internship">Internship</option>
             </select>
           </div>

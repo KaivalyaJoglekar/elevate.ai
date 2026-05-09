@@ -23,9 +23,9 @@ export default function UploadPage() {
     setError: setContextError,
     isLoading: ctxLoading,
   } = useResumeContext();
-  const [targetRole, setTargetRole] = useState("Software Engineer");
-  const [experienceLevel, setExperienceLevel] = useState("Entry Level");
-  const [jobDescription, setJobDescription] = useState("");
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [targetRole, setTargetRole] = useState("");
+  const [experienceLevel, setExperienceLevel] = useState("Full-Time");
   const {
     file,
     isDragging,
@@ -37,21 +37,26 @@ export default function UploadPage() {
     handleFileSelect,
     handleRemoveFile,
     handleAnalyze,
+    setError,
   } = useResumeUpload();
 
-  const loading = isLoading || ctxLoading;
+  const loading = isLoading || ctxLoading || isRedirecting;
   const resumeDashboardHref = taskId ? `/dashboard/${taskId}` : null;
 
   const onAnalyze = async () => {
     if (!file) return;
+    if (!targetRole.trim()) {
+      setError("Enter a target role before generating the report.");
+      return;
+    }
+    setIsRedirecting(false);
     setCtxLoading(true);
     setContextError(null);
 
     try {
       const result = await handleAnalyze({
-        targetRole,
+        targetRole: targetRole.trim(),
         experienceLevel,
-        jobDescription,
       });
       if (!result) {
         return;
@@ -60,6 +65,7 @@ export default function UploadPage() {
       setTaskId(result.task_id);
       setAnalysisStatus(result);
       setContextError(result.error);
+      setIsRedirecting(true);
       router.push(`/dashboard/${result.task_id}`);
     } finally {
       setCtxLoading(false);
@@ -96,6 +102,7 @@ export default function UploadPage() {
               file={file}
               isDragging={isDragging}
               isLoading={loading}
+              canAnalyze={Boolean(file && targetRole.trim())}
               error={error}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
@@ -113,33 +120,20 @@ export default function UploadPage() {
                     value={targetRole}
                     onChange={(event) => setTargetRole(event.target.value)}
                     placeholder="e.g. Backend Engineer, Data Analyst, Product Designer"
-                    className="w-full rounded-xl border border-ev-border bg-white/[0.03] px-4 py-3 text-sm text-ev-text outline-none transition-colors focus:border-ev-gold/40"
+                    className="w-full rounded-xl border border-ev-border bg-white/[0.03] px-4 py-3 text-sm text-ev-text outline-none transition-colors placeholder:text-ev-text-muted focus:border-ev-gold/40"
                   />
                 </div>
 
                 <div>
-                  <label className="section-label block mb-2">Experience Level</label>
+                  <label className="section-label block mb-2">Track</label>
                   <select
                     value={experienceLevel}
                     onChange={(event) => setExperienceLevel(event.target.value)}
                     className="w-full rounded-xl border border-ev-border bg-white/[0.03] px-4 py-3 text-sm text-ev-text outline-none transition-colors focus:border-ev-gold/40"
                   >
-                    <option value="Entry Level">Entry Level</option>
-                    <option value="Mid Level">Mid Level</option>
-                    <option value="Senior Level">Senior Level</option>
+                    <option value="Full-Time">Full-Time</option>
                     <option value="Internship">Internship</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="section-label block mb-2">Job Description</label>
-                  <textarea
-                    value={jobDescription}
-                    onChange={(event) => setJobDescription(event.target.value)}
-                    rows={5}
-                    placeholder="Paste a target job description to tailor the analysis."
-                    className="w-full rounded-xl border border-ev-border bg-white/[0.03] px-4 py-3 text-sm text-ev-text outline-none transition-colors focus:border-ev-gold/40"
-                  />
                 </div>
               </div>
             </section>

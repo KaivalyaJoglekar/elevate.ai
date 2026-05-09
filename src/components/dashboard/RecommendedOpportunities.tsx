@@ -6,6 +6,7 @@ import { Building2, ExternalLink, Loader2, MapPin, RefreshCcw, Search, Sparkles 
 import GlassCard from "@/components/ui/GlassCard";
 import SectionHeader from "@/components/ui/SectionHeader";
 import { fetchJobs } from "@/lib/api";
+import { matchesRequestedJobType } from "@/lib/utils";
 import type { CareerPath, JobSearchType } from "@/types/analysis";
 
 interface RecommendedOpportunitiesProps {
@@ -115,11 +116,13 @@ export default function RecommendedOpportunities({
   }, []);
 
   const displayedPaths = useMemo(() => {
-    if (searchResults) {
-      return searchResults;
-    }
-    return careerPaths;
-  }, [careerPaths, searchResults]);
+    const source = searchResults || careerPaths;
+    return source.filter((path) => matchesRequestedJobType(path, jobType));
+  }, [careerPaths, jobType, searchResults]);
+
+  const fallbackPaths = useMemo(() => {
+    return careerPaths.filter((path) => matchesRequestedJobType(path, jobType));
+  }, [careerPaths, jobType]);
 
   const runSearch = async (rawQuery: string) => {
     const query = rawQuery.trim();
@@ -145,10 +148,11 @@ export default function RecommendedOpportunities({
       if (controller.signal.aborted) {
         return;
       }
-      setSearchResults(results);
+      const filteredResults = results.filter((path) => matchesRequestedJobType(path, jobType));
+      setSearchResults(filteredResults);
       setActiveSearch(query);
       setSearchError(
-        results.length === 0
+        filteredResults.length === 0
           ? `No live ${jobType} roles matched "${query}" yet. Try a broader title or remove extra qualifiers.`
           : null
       );
@@ -182,7 +186,7 @@ export default function RecommendedOpportunities({
   };
 
   const isShowingSearchResults = Boolean(searchResults);
-  const showLoadingCards = isSearching && displayedPaths.length === 0;
+  const showLoadingCards = isSearching && fallbackPaths.length === 0;
 
   return (
     <motion.div
