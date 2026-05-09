@@ -59,9 +59,52 @@ export function groupSkillsByCategory(skills: { name: string }[]): Record<string
 }
 
 const INTERNSHIP_HINTS = ["intern", "internship", "trainee", "apprentice", "co-op", "coop"];
+const GENERIC_MISSING_KEYWORD_LABELS = new Set([
+  "about",
+  "ability",
+  "across",
+  "adapt",
+  "advanced",
+  "alignment",
+  "api",
+  "apis",
+  "communication",
+  "deep",
+  "delivery",
+  "depth",
+  "developer",
+  "engineer",
+  "evaluate",
+  "generative",
+  "intelligence",
+  "lead",
+  "production",
+  "project",
+  "readiness",
+  "scientist",
+  "senior",
+  "tooling",
+]);
 
 export function normalizeLabel(value: string): string {
   return value.trim().replace(/\s+/g, " ");
+}
+
+export function sanitizeMissingKeywordLabel(value: string): string | null {
+  const normalized = normalizeLabel(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const lowered = normalized.toLowerCase();
+  if (GENERIC_MISSING_KEYWORD_LABELS.has(lowered)) {
+    return null;
+  }
+  if (/^[a-z]\/\d+$/i.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
 }
 
 export function isInternshipLikeRole(role: string, employmentType?: string | null): boolean {

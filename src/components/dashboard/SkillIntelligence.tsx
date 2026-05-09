@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle, Sparkles, Target } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import SectionHeader from "@/components/ui/SectionHeader";
-import { groupSkillsByCategory, normalizeLabel } from "@/lib/utils";
+import { groupSkillsByCategory, normalizeLabel, sanitizeMissingKeywordLabel } from "@/lib/utils";
 import type { CareerPath, Skill } from "@/types/analysis";
 
 interface SkillIntelligenceProps {
@@ -52,7 +52,7 @@ export default function SkillIntelligence({
       }
     };
 
-    missingKeywords.forEach((keyword) => register(keyword));
+    missingKeywords.forEach((keyword) => register(sanitizeMissingKeywordLabel(keyword) || ""));
     careerPaths.forEach((path) => {
       path.skillsToDevelop?.forEach((skill) => {
         register(typeof skill === "string" ? skill : skill.name);

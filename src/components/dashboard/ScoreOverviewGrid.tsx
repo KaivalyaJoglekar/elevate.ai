@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Shield, Zap, TrendingUp, AlertTriangle } from "lucide-react";
 import GlassCard from "@/components/ui/GlassCard";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
-import { normalizeLabel } from "@/lib/utils";
+import { normalizeLabel, sanitizeMissingKeywordLabel } from "@/lib/utils";
 import type { CareerData } from "@/types/analysis";
 
 interface ScoreOverviewGridProps {
@@ -55,7 +55,12 @@ export default function ScoreOverviewGrid({ data }: ScoreOverviewGridProps) {
     allMissingSkills.add(normalized.toLowerCase());
   };
 
-  data.atsScore?.missingKeywords?.forEach((keyword) => registerMissingSkill(keyword));
+  data.atsScore?.missingKeywords?.forEach((keyword) => {
+    const sanitized = sanitizeMissingKeywordLabel(keyword);
+    if (sanitized) {
+      registerMissingSkill(sanitized);
+    }
+  });
   validPaths.forEach((p) => {
     p.skillsToDevelop?.forEach((s) => {
       const name = typeof s === "string" ? s : s.name;

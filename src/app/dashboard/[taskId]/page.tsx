@@ -18,7 +18,7 @@ import ErrorState from "@/components/ui/ErrorState";
 import GlassCard from "@/components/ui/GlassCard";
 import ProcessingOverlay from "@/components/upload/ProcessingOverlay";
 import { useResumeContext } from "@/hooks/useResumeContext";
-import { fetchAnalysisStatus, retargetExistingAnalysis } from "@/lib/api";
+import { fetchAnalysisStatus, retargetExistingAnalysis, warmupBackend } from "@/lib/api";
 import type { AnalysisTrackKey } from "@/types/analysis";
 
 const TRACK_STORAGE_PREFIX = "elevate:dashboard-track:";
@@ -63,10 +63,10 @@ function getFriendlyMarketStatus(message?: string | null, marketPending?: boolea
 
   const lowered = normalized.toLowerCase();
   if (lowered.includes("name 'asyncio' is not defined")) {
-    return "Live market roles are temporarily unavailable. You can still search JSearch manually below.";
+    return "Live market roles are temporarily unavailable. You can still search manually below.";
   }
   if (lowered.includes("timed out")) {
-    return "Live market data is taking longer than expected. You can still search JSearch manually below.";
+    return "Live market data is taking longer than expected. You can still search manually below.";
   }
   if (
     lowered.startsWith("live market feed unavailable:") ||
@@ -74,7 +74,7 @@ function getFriendlyMarketStatus(message?: string | null, marketPending?: boolea
     lowered.includes("requesterror") ||
     lowered.includes("service unavailable")
   ) {
-    return "Live market roles are temporarily unavailable. You can still search JSearch manually below.";
+    return "Live market roles are temporarily unavailable. You can still search manually below.";
   }
 
   return normalized;
@@ -99,6 +99,11 @@ export default function DashboardTaskPage() {
   const latestPayloadSignatureRef = useRef<string | null>(null);
   const persistedTrackRef = useRef<AnalysisTrackKey | null>(null);
   const [hasResolvedInitialLoad, setHasResolvedInitialLoad] = useState(false);
+  const currentTaskStatus = analysisStatus?.task_id === taskId ? analysisStatus : null;
+
+  useEffect(() => {
+    setIsRetargeting(false);
+  }, [taskId]);
 
   const applyAnalysisStatus = useCallback((payload: NonNullable<typeof analysisStatus>) => {
     const nextSignature = JSON.stringify(payload);
@@ -116,9 +121,16 @@ export default function DashboardTaskPage() {
     }
 
     setTaskId(taskId);
-    latestPayloadSignatureRef.current = null;
-    setHasResolvedInitialLoad(Boolean(analysisStatus?.task_id === taskId));
-  }, [analysisStatus?.task_id, router, setTaskId, taskId]);
+
+    if (analysisStatus?.task_id !== taskId) {
+      latestPayloadSignatureRef.current = null;
+      setError(null);
+      setHasResolvedInitialLoad(false);
+      return;
+    }
+
+    setHasResolvedInitialLoad(true);
+  }, [analysisStatus?.task_id, router, setError, setTaskId, taskId]);
 
   useEffect(() => {
     if (!taskId || typeof window === "undefined") {
@@ -153,7 +165,7 @@ export default function DashboardTaskPage() {
       return;
     }
 
-    if (analysisStatus?.task_id === taskId) {
+    if (currentTaskStatus) {
       setHasResolvedInitialLoad(true);
       return;
     }
@@ -163,6 +175,7 @@ export default function DashboardTaskPage() {
     const load = async () => {
       setIsLoading(true);
       try {
+        await warmupBackend(controller.signal);
         const payload = await fetchAnalysisStatus(taskId, controller.signal);
         applyAnalysisStatus(payload);
         setError(payload.error);
@@ -182,10 +195,10 @@ export default function DashboardTaskPage() {
     void load();
 
     return () => controller.abort();
-  }, [analysisStatus?.task_id, applyAnalysisStatus, isRetargeting, setError, setIsLoading, taskId]);
+  }, [applyAnalysisStatus, currentTaskStatus, isRetargeting, setError, setIsLoading, taskId]);
 
   useEffect(() => {
-    if (!taskId || !analysisStatus || analysisStatus.task_id !== taskId) {
+    if (!taskId || !currentTaskStatus) {
       return;
     }
 
@@ -194,8 +207,8 @@ export default function DashboardTaskPage() {
     }
 
     const shouldContinuePolling =
-      ["queued", "processing"].includes(analysisStatus.status) ||
-      (analysisStatus.status === "completed" && Boolean(analysisStatus.result?.job_market_pending));
+      ["queued", "processing"].includes(currentTaskStatus.status) ||
+      (currentTaskStatus.status === "completed" && Boolean(currentTaskStatus.result?.job_market_pending));
 
     if (!shouldContinuePolling) {
       return;
@@ -206,7 +219,7 @@ export default function DashboardTaskPage() {
     const pollingStartedAt = Date.now();
     const controller = new AbortController();
 
-    const pollingDelayMs = analysisStatus.status === "completed" ? 2500 : 1500;
+    const pollingDelayMs = currentTaskStatus.status === "completed" ? 2500 : 1500;
 
     let timeoutId = window.setTimeout(async function poll() {
       if (controller.signal.aborted) {
@@ -240,14 +253,14 @@ export default function DashboardTaskPage() {
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [analysisStatus, applyAnalysisStatus, isRetargeting, setError, setIsLoading, taskId]);
+  }, [applyAnalysisStatus, currentTaskStatus, isRetargeting, setError, setIsLoading, taskId]);
 
   useEffect(() => {
-    const result = analysisStatus?.result;
+    const result = currentTaskStatus?.result;
     if (!result) {
       return;
     }
-    if (selectedTrackTaskIdRef.current === analysisStatus?.task_id) {
+    if (selectedTrackTaskIdRef.current === currentTaskStatus.task_id) {
       return;
     }
 
@@ -257,11 +270,11 @@ export default function DashboardTaskPage() {
         : "full_time_analysis"
     );
     setSelectedTrack(defaultTrack);
-    selectedTrackTaskIdRef.current = analysisStatus?.task_id ?? null;
+    selectedTrackTaskIdRef.current = currentTaskStatus.task_id;
     persistedTrackRef.current = null;
-  }, [analysisStatus?.result, analysisStatus?.task_id]);
+  }, [currentTaskStatus]);
 
-  const activeResult = analysisStatus?.result;
+  const activeResult = currentTaskStatus?.result;
   const activeAnalysis = useMemo(() => {
     if (!activeResult) {
       return null;
@@ -283,7 +296,7 @@ export default function DashboardTaskPage() {
     ? activeResult?.full_time_query
     : activeResult?.internship_query;
   const friendlyMarketStatus = getFriendlyMarketStatus(activeResult?.job_market_status, isMarketPending);
-  const friendlyDashboardError = getFriendlyDashboardError(analysisStatus?.error || error);
+  const friendlyDashboardError = getFriendlyDashboardError(currentTaskStatus?.error || error);
 
   const handleNewAnalysis = () => {
     setTaskId(null);
@@ -305,6 +318,7 @@ export default function DashboardTaskPage() {
 
     setIsRetargeting(true);
     setError(null);
+    let queuedNavigation = false;
 
     try {
       const nextPayload = await retargetExistingAnalysis(taskId, {
@@ -315,13 +329,16 @@ export default function DashboardTaskPage() {
       setTaskId(nextPayload.task_id);
       selectedTrackTaskIdRef.current = null;
       latestPayloadSignatureRef.current = null;
-      setAnalysisStatus(nextPayload);
-      setError(nextPayload.error);
+      persistedTrackRef.current = null;
+      setHasResolvedInitialLoad(false);
+      queuedNavigation = true;
       router.push(`/dashboard/${nextPayload.task_id}`);
     } catch (retargetError) {
       setError(retargetError instanceof Error ? retargetError.message : "Failed to re-target analysis.");
     } finally {
-      setIsRetargeting(false);
+      if (!queuedNavigation) {
+        setIsRetargeting(false);
+      }
     }
   };
 
@@ -329,27 +346,36 @@ export default function DashboardTaskPage() {
     return null;
   }
 
+  const isTaskProcessing = Boolean(
+    currentTaskStatus && ["queued", "processing"].includes(currentTaskStatus.status)
+  );
+  const hasStaleTaskSnapshot = Boolean(analysisStatus && analysisStatus.task_id !== taskId);
   const showOverlay =
-    isRetargeting ||
-    isLoading ||
-    (analysisStatus?.task_id === taskId &&
-      ["queued", "processing"].includes(analysisStatus.status));
+    isTaskProcessing ||
+    hasStaleTaskSnapshot ||
+    (!hasResolvedInitialLoad && isLoading);
   const isDashboardPending =
     !hasResolvedInitialLoad ||
-    isLoading ||
-    (analysisStatus?.task_id === taskId &&
-      ["queued", "processing"].includes(analysisStatus.status));
+    hasStaleTaskSnapshot ||
+    isTaskProcessing ||
+    (!hasResolvedInitialLoad && isLoading);
+  const overlayStepLabel = isTaskProcessing
+    ? isMarketPending
+      ? "Gathering job market data"
+      : currentTaskStatus?.current_step
+    : hasStaleTaskSnapshot
+      ? "Restoring your latest dashboard view"
+    : !hasResolvedInitialLoad && isLoading
+      ? "Restoring your latest dashboard view"
+      : undefined;
+  const overlayProgress = isTaskProcessing ? currentTaskStatus?.progress : undefined;
 
   return (
     <>
       <ProcessingOverlay
         isVisible={showOverlay}
-        currentStepLabel={isRetargeting
-          ? "Re-targeting for your new role"
-          : isMarketPending
-            ? "Gathering job market data"
-            : analysisStatus?.current_step}
-        progress={isRetargeting ? undefined : analysisStatus?.progress}
+        currentStepLabel={overlayStepLabel}
+        progress={overlayProgress}
       />
       <FloatingNavbar />
 
@@ -377,7 +403,7 @@ export default function DashboardTaskPage() {
               </GlassCard>
             ) : (
               <ErrorState
-                title={analysisStatus?.status === "failed" ? "Analysis failed" : "Analysis unavailable"}
+                title={currentTaskStatus?.status === "failed" ? "Analysis failed" : "Analysis unavailable"}
                 message={friendlyDashboardError}
                 onRetry={handleNewAnalysis}
               />
@@ -446,14 +472,6 @@ export default function DashboardTaskPage() {
                   </div>
                 </div>
               </div>
-
-              <RetargetAnalysisPanel
-                initialTargetRole={activeResult?.target_role}
-                initialExperienceLevel={activeResult?.experience_level}
-                initialJobDescription={activeResult?.job_description_raw}
-                isLoading={isRetargeting}
-                onSubmit={handleRetarget}
-              />
             </section>
 
             <ScoreOverviewGrid data={activeAnalysis} />
@@ -517,7 +535,14 @@ export default function DashboardTaskPage() {
               marketQuery={activeMarketQuery}
               jobType={selectedTrack === "full_time_analysis" ? "full-time" : "internship"}
               marketRegion={activeResult?.market_context?.region_name}
-              targetRole={activeResult?.target_role}
+            />
+
+            <RetargetAnalysisPanel
+              initialTargetRole={activeResult?.target_role}
+              initialExperienceLevel={activeResult?.experience_level}
+              initialJobDescription={activeResult?.job_description_raw}
+              isLoading={isRetargeting}
+              onSubmit={handleRetarget}
             />
           </motion.div>
         )}

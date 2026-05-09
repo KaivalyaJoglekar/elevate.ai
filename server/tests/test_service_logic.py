@@ -12,6 +12,7 @@ class ServiceLogicTests(unittest.TestCase):
             [{"name": "Python"}, {"name": "FastAPI"}, {"name": "SQL"}],
             "Looking for backend engineer roles in product companies",
             market_region="India",
+            job_type="full-time",
         )
 
         self.assertIn("India", query)
@@ -30,12 +31,32 @@ class ServiceLogicTests(unittest.TestCase):
             ],
             "Build APIs with SQL and cloud services",
             market_region="India",
+            job_type="full-time",
         )
 
         self.assertIn("Python", query)
         self.assertIn("FastAPI", query)
         self.assertNotIn("Communication", query)
         self.assertNotIn("Leadership", query)
+
+    def test_job_search_query_respects_selected_job_type(self) -> None:
+        internship_query = build_job_search_query(
+            "AI Engineer",
+            [{"name": "Python"}],
+            "Build RAG systems",
+            market_region="India",
+            job_type="internship",
+        )
+        full_time_query = build_job_search_query(
+            "AI Engineer Internship",
+            [{"name": "Python"}],
+            "Build RAG systems",
+            market_region="India",
+            job_type="full-time",
+        )
+
+        self.assertIn("internship", internship_query.lower())
+        self.assertNotIn("internship", full_time_query.lower())
 
     def test_market_enrichment_completes_with_async_job_search(self) -> None:
         base_result = {

@@ -115,6 +115,8 @@ export const retargetExistingAnalysis = async (
   },
   signal?: AbortSignal
 ): Promise<AnalysisStatusPayload> => {
+  await warmupBackend(signal);
+
   const response = await fetch(`${API_BASE_URL}/api/re-target/${taskId}`, {
     method: "POST",
     headers: {

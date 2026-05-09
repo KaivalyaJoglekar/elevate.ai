@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useResumeContext } from "@/hooks/useResumeContext";
 import { useResumeUpload } from "@/hooks/useResumeUpload";
+import { warmupBackend } from "@/lib/api";
 import FloatingNavbar from "@/components/layout/FloatingNavbar";
 import UploadHero from "@/components/upload/UploadHero";
 import ResumeUploadConsole from "@/components/upload/ResumeUploadConsole";
-import ProcessingOverlay from "@/components/upload/ProcessingOverlay";
 import BlackCanvasBackground from "@/components/background/BlackCanvasBackground";
 
 export default function UploadPage() {
@@ -19,11 +19,8 @@ export default function UploadPage() {
     analysisStatus,
     setTaskId,
     setAnalysisStatus,
-    setIsLoading: setCtxLoading,
     setError: setContextError,
-    isLoading: ctxLoading,
   } = useResumeContext();
-  const [isRedirecting, setIsRedirecting] = useState(false);
   const [targetRole, setTargetRole] = useState("");
   const [experienceLevel, setExperienceLevel] = useState("Full-Time");
   const {
@@ -40,8 +37,13 @@ export default function UploadPage() {
     setError,
   } = useResumeUpload();
 
-  const loading = isLoading || ctxLoading || isRedirecting;
   const resumeDashboardHref = taskId ? `/dashboard/${taskId}` : null;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void warmupBackend(controller.signal);
+    return () => controller.abort();
+  }, []);
 
   const onAnalyze = async () => {
     if (!file) return;
@@ -49,33 +51,25 @@ export default function UploadPage() {
       setError("Enter a target role before generating the report.");
       return;
     }
-    setIsRedirecting(false);
-    setCtxLoading(true);
     setContextError(null);
 
-    try {
-      const result = await handleAnalyze({
-        targetRole: targetRole.trim(),
-        experienceLevel,
-      });
-      if (!result) {
-        return;
-      }
-
-      setTaskId(result.task_id);
-      setAnalysisStatus(result);
-      setContextError(result.error);
-      setIsRedirecting(true);
-      router.push(`/dashboard/${result.task_id}`);
-    } finally {
-      setCtxLoading(false);
+    const result = await handleAnalyze({
+      targetRole: targetRole.trim(),
+      experienceLevel,
+    });
+    if (!result) {
+      return;
     }
+
+    setTaskId(result.task_id);
+    setAnalysisStatus(result);
+    setContextError(result.error);
+    router.push(`/dashboard/${result.task_id}`);
   };
 
   return (
     <>
       <BlackCanvasBackground />
-      <ProcessingOverlay isVisible={loading} />
       <FloatingNavbar />
 
       <main className="min-h-screen px-4 sm:px-6 pt-24 pb-16">
@@ -101,7 +95,7 @@ export default function UploadPage() {
             <ResumeUploadConsole
               file={file}
               isDragging={isDragging}
-              isLoading={loading}
+              isLoading={isLoading}
               canAnalyze={Boolean(file && targetRole.trim())}
               error={error}
               onDrop={handleDrop}

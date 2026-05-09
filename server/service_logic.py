@@ -39,6 +39,8 @@ GENERIC_QUERY_STOPWORDS = {
     'on', 'or', 'role', 'roles', 'the', 'to', 'with', 'years', 'year',
 }
 
+INTERNSHIP_QUERY_PATTERN = re.compile(r'\b(intern|internship|trainee|apprentice|co-?op)\b', re.IGNORECASE)
+
 async def run_jobs_search(query: str, job_type: str, *, fallback_queries: list[str] | None = None) -> list:
     settings = get_settings()
     search_candidates = _unique_terms([
@@ -48,13 +50,14 @@ async def run_jobs_search(query: str, job_type: str, *, fallback_queries: list[s
     ])[: max(1, settings.job_search_max_candidates)]
 
     for candidate in search_candidates:
+        normalized_candidate = _normalize_search_query_for_job_type(candidate, job_type)
         if job_type == 'full-time':
-            jobs_data = await fetch_fulltime_jobs_from_jsearch(candidate)
+            jobs_data = await fetch_fulltime_jobs_from_jsearch(normalized_candidate)
         else:
-            jobs_data = await fetch_internships_from_jsearch(candidate)
+            jobs_data = await fetch_internships_from_jsearch(normalized_candidate)
 
         if jobs_data:
-            query_skills = candidate.split()
+            query_skills = normalized_candidate.split()
             return adapt_jsearch_to_career_path(jobs_data, job_type, query_skills)
 
     return []
@@ -219,12 +222,26 @@ def _build_role_search_fallbacks(target_role: str, market_region: str, job_type:
     return fallbacks
 
 
+def _normalize_search_query_for_job_type(query: str, job_type: str) -> str:
+    normalized = re.sub(r'\s+', ' ', query).strip()
+    if not normalized:
+        return ''
+
+    if job_type == 'internship':
+        return normalized if INTERNSHIP_QUERY_PATTERN.search(normalized) else f'{normalized} internship'
+
+    stripped = INTERNSHIP_QUERY_PATTERN.sub(' ', normalized)
+    stripped = re.sub(r'\s+', ' ', stripped).strip(' ,-/')
+    return stripped or normalized
+
+
 def build_job_search_query(
     target_role: str,
     extracted_skills: list[dict[str, str]],
     fallback_text: str = '',
     *,
     market_region: str = 'India',
+    job_type: str = 'full-time',
 ) -> str:
     top_skills = _filter_search_skills(extracted_skills)
     role = target_role.strip() or 'Software Engineer'
@@ -239,7 +256,8 @@ def build_job_search_query(
     region = market_region.strip()
     if region and region.lower() not in query.lower():
         query = f'{query} {region}'.strip()
-    return query or role
+    normalized_query = _normalize_search_query_for_job_type(query or role, job_type)
+    return normalized_query or role
 
 
 async def _safe_job_search(query: str, job_type: str, *, fallback_queries: list[str] | None = None) -> tuple[list, str | None]:
@@ -303,12 +321,14 @@ async def build_resume_review_core(
         full_time_analysis['extractedSkills'],
         job_description,
         market_region=settings.market_region_name,
+        job_type='full-time',
     )
     internship_query = build_job_search_query(
         target_role,
         internship_analysis['extractedSkills'],
         job_description,
         market_region=settings.market_region_name,
+        job_type='internship',
     )
     total_elapsed_ms = round((time.perf_counter() - analysis_started_at) * 1000, 2)
     return {

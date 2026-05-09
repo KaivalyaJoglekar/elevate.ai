@@ -14,7 +14,6 @@ interface RecommendedOpportunitiesProps {
   marketQuery?: string;
   jobType: JobSearchType;
   marketRegion?: string;
-  targetRole?: string;
 }
 
 function formatLocation(path: CareerPath) {
@@ -36,49 +35,7 @@ function getInitials(input: string) {
 }
 
 function getFriendlySearchError() {
-  return "JSearch is temporarily unavailable. Try again in a few moments.";
-}
-
-function buildSuggestedQueries(
-  careerPaths: CareerPath[],
-  targetRole?: string
-) {
-  const seen = new Set<string>();
-  const suggestions: string[] = [];
-
-  const push = (value?: string) => {
-    const normalized = value?.trim();
-    if (!normalized) return;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    suggestions.push(normalized);
-  };
-
-  push(targetRole);
-  careerPaths.slice(0, 6).forEach((path) => push(path.role));
-
-  const lowered = (targetRole || "").toLowerCase();
-  if (lowered.includes("backend")) {
-    push("Platform Engineer");
-    push("Full Stack Developer");
-  } else if (lowered.includes("frontend")) {
-    push("UI Engineer");
-    push("Full Stack Developer");
-  } else if (lowered.includes("data")) {
-    push("Business Analyst");
-    push("Machine Learning Engineer");
-  } else if (lowered.includes("product")) {
-    push("Product Analyst");
-    push("Business Analyst");
-  } else {
-    push("Backend Engineer");
-    push("Frontend Engineer");
-    push("Full Stack Developer");
-    push("Data Analyst");
-  }
-
-  return suggestions.slice(0, 7);
+  return "Live role search is temporarily unavailable. Try again in a few moments.";
 }
 
 export default function RecommendedOpportunities({
@@ -86,7 +43,6 @@ export default function RecommendedOpportunities({
   marketQuery,
   jobType,
   marketRegion,
-  targetRole,
 }: RecommendedOpportunitiesProps) {
   const [draftSearch, setDraftSearch] = useState(marketQuery || "");
   const [searchResults, setSearchResults] = useState<CareerPath[] | null>(null);
@@ -95,10 +51,6 @@ export default function RecommendedOpportunities({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const searchControllerRef = useRef<AbortController | null>(null);
-  const suggestedQueries = useMemo(
-    () => buildSuggestedQueries(careerPaths, targetRole),
-    [careerPaths, targetRole]
-  );
 
   useEffect(() => {
     searchControllerRef.current?.abort();
@@ -195,14 +147,14 @@ export default function RecommendedOpportunities({
       transition={{ duration: 0.5, delay: 0.55 }}
     >
       <SectionHeader
-        label="JSearch Explorer"
-        title="Recommended opportunities and other roles"
+        label="Live Roles"
+        title="Recommended opportunities"
         subtitle={
           activeSearch
-            ? `Showing fresh JSearch ${jobType} results for: ${activeSearch}`
+            ? `Showing fresh ${jobType} results for: ${activeSearch}`
             : marketQuery
-              ? `Current ${marketRegion || "India"} market query: ${marketQuery}. Search any other role below.`
-              : "Role matches generated from the live JSearch feed."
+              ? `Current ${marketRegion || "India"} market query: ${marketQuery}. Search another ${jobType} role below.`
+              : "Role matches generated from the live market feed."
         }
       />
 
@@ -348,30 +300,11 @@ export default function RecommendedOpportunities({
       >
         <div className="mx-auto max-w-2xl text-center">
           <p className="section-label mb-2">Find More Roles</p>
-          <h3 className="text-2xl font-display font-bold text-ev-text">Search JSearch for other roles</h3>
+          <h3 className="text-2xl font-display font-bold text-ev-text">Search other roles</h3>
           <p className="mt-2 text-sm text-ev-text-secondary">
-            Pull fresh {jobType} openings from the {marketRegion || "India"} market and replace these cards with a new JSearch query.
+            Pull fresh {jobType} openings from the {marketRegion || "India"} market and replace these cards with a track-aware live search.
           </p>
         </div>
-
-        {suggestedQueries.length > 0 && (
-          <div className="mx-auto mt-5 flex max-w-3xl flex-wrap justify-center gap-2">
-            {suggestedQueries.map((query) => (
-              <button
-                key={query}
-                type="button"
-                onClick={() => {
-                  setDraftSearch(query);
-                  void runSearch(query);
-                }}
-                disabled={isSearching}
-                className="dashboard-pill rounded-full px-3 py-2 text-xs text-ev-text-secondary transition-colors hover:border-ev-gold/30 hover:text-ev-text disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {query}
-              </button>
-            ))}
-          </div>
-        )}
 
         <form
           onSubmit={handleSearch}
@@ -382,7 +315,7 @@ export default function RecommendedOpportunities({
             <input
               value={draftSearch}
               onChange={(event) => setDraftSearch(event.target.value)}
-              placeholder={`Search another role on JSearch${marketRegion ? ` in ${marketRegion}` : ""}`}
+              placeholder={`Search another ${jobType} role${marketRegion ? ` in ${marketRegion}` : ""}`}
               className="dashboard-pill w-full rounded-full py-3 pl-11 pr-4 text-sm text-ev-text outline-none transition-colors focus:border-ev-gold/35"
             />
           </label>

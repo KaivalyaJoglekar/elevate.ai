@@ -29,7 +29,19 @@ STOPWORDS = {
     'you', 'will', 'our', 'this', 'their', 'they', 'we', 'who', 'have', 'has',
     'had', 'were', 'was', 'been', 'than', 'then', 'such', 'across', 'over', 'per',
     'role', 'team', 'years', 'year', 'experience', 'skills', 'work', 'ability',
+    'about', 'alignment', 'apply', 'candidate', 'candidates', 'delivery', 'depth',
+    'communication', 'collaboration', 'evaluate', 'evaluation', 'impact', 'leadership',
+    'looking', 'ownership', 'production', 'readiness', 'required', 'requirements',
+    'responsibilities', 'responsibility', 'technical', 'tooling', 'preferred',
 }
+
+ROLE_TITLE_STOPWORDS = {
+    'analyst', 'associate', 'consultant', 'contractor', 'coordinator', 'developer',
+    'engineer', 'executive', 'fellow', 'head', 'intern', 'internship', 'lead',
+    'manager', 'officer', 'principal', 'scientist', 'specialist', 'staff', 'trainee',
+}
+
+SPECIAL_SHORT_KEYWORDS = {'ai', 'bi', 'ml', 'nlp', 'qa', 'ui', 'ux', 'llm'}
 
 
 def get_sentence_model() -> Any:
@@ -180,11 +192,81 @@ def validate_resume_text_quality(resume_text: str, *, minimum_words: int | None 
     return word_count
 
 
+def _normalize_keyword_token(token: str) -> str:
+    return token.strip().lower().strip('.,:;()[]{}')
+
+
+def _is_meaningful_keyword_token(token: str) -> bool:
+    normalized = _normalize_keyword_token(token)
+    if not normalized:
+        return False
+    if normalized in STOPWORDS or normalized in ROLE_TITLE_STOPWORDS:
+        return False
+    if re.fullmatch(r'[a-z]/\d+', normalized):
+        return False
+    if len(normalized) < 3 and normalized not in SPECIAL_SHORT_KEYWORDS:
+        return False
+    return bool(re.search(r'[a-z0-9]', normalized))
+
+
 def _extract_keywords(job_description: str, limit: int = 20) -> list[str]:
-    tokens = re.findall(r'[A-Za-z][A-Za-z0-9+.#-]{2,}', job_description.lower())
-    filtered = [token for token in tokens if token not in STOPWORDS]
+    tokens = re.findall(r'[A-Za-z][A-Za-z0-9+.#/-]{1,}', job_description.lower())
+    filtered = [token for token in tokens if _is_meaningful_keyword_token(token)]
     counts = Counter(filtered)
     return [token for token, _ in counts.most_common(limit)]
+
+
+def _extract_role_keywords(target_role: str, limit: int = 6) -> list[str]:
+    normalized_role = re.sub(r'\s+', ' ', target_role.strip())
+    if not normalized_role:
+        return []
+
+    role_keywords: list[str] = []
+    seen: set[str] = set()
+
+    def register(value: str) -> None:
+        normalized = value.strip().lower()
+        if not normalized or normalized in seen:
+            return
+        seen.add(normalized)
+        role_keywords.append(normalized)
+
+    role_tokens = [
+        _normalize_keyword_token(token)
+        for token in re.findall(r'[A-Za-z][A-Za-z0-9+.#/-]{1,}', normalized_role)
+    ]
+    content_tokens = [
+        token
+        for token in role_tokens
+        if _is_meaningful_keyword_token(token) and token not in ROLE_TITLE_STOPWORDS
+    ]
+
+    if content_tokens:
+        if len(content_tokens) > 1:
+            register(' '.join(content_tokens))
+        register(normalized_role)
+        for token in content_tokens:
+            register(token)
+
+    return role_keywords[:limit]
+
+
+def _extract_reference_keywords(target_role: str, job_description: str, *, limit: int = 20) -> list[str]:
+    role_keywords = _extract_role_keywords(target_role, limit=max(4, min(limit, 6)))
+    if not job_description.strip():
+        return role_keywords[:limit]
+
+    merged: list[str] = []
+    seen: set[str] = set()
+    for keyword in [*role_keywords, *_extract_keywords(job_description, limit=limit)]:
+        normalized = keyword.strip().lower()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        merged.append(normalized)
+        if len(merged) >= limit:
+            break
+    return merged
 
 
 def build_reference_text(target_role: str, job_description: str) -> str:
@@ -321,9 +403,13 @@ def compute_ats_evaluation(
         similarity = float(util.cos_sim(embeddings[0], embeddings[1]).item())
         semantic_score = max(0, min(100, round(((similarity + 1.0) / 2.0) * 100)))
 
-    keywords = _extract_keywords(reference_text)
+    keywords = _extract_reference_keywords(target_role, job_description)
     if keywords:
-        matched_keywords = [keyword for keyword in keywords if re.search(rf'\b{re.escape(keyword)}\b', resume_text, re.IGNORECASE)]
+        matched_keywords = [
+            keyword
+            for keyword in keywords
+            if re.search(rf'(?<!\w){re.escape(keyword)}(?!\w)', resume_text, re.IGNORECASE)
+        ]
         keyword_score = round((len(matched_keywords) / len(keywords)) * 100)
     else:
         matched_keywords = []
